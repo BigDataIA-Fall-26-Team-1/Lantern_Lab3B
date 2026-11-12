@@ -16,8 +16,10 @@ from mcp.server import MCPServer
 from creditwatch import catalog, channel, panel, signals
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
-from services.mcp.schemas import (Adsh, BdcName, Filing, Holding, MandateList, MandateProfile,
-                                  MandateScope, Scope, Signal, WatchlistEntry)
+from services.mcp.schemas import (Adsh, ApprovalRequest, BdcName, DraftResult, Filing, Holding,
+                                  MandateList, MandateProfile, MandateScope, MemoryHit,
+                                  ProposeWriteResult, Scope, SendResult, Signal, WatchlistEntry,
+                                  WatchlistWriteResult)
 
 REGISTRY = {                      # tool -> action class; the closed catalog, nothing else
     "list_mandates": "READ",
@@ -126,5 +128,51 @@ def build_server(session, audit, root=ROOT, panel_df=None):
         text = (ws / "mandates" / scope / "WATCHLIST.md").read_text(encoding="utf-8")
         done("watchlist_read", scope)
         return [WatchlistEntry(**m.groupdict()) for m in map(WATCH_LINE.match, text.splitlines()) if m]
+
+    # ---------------------------------------------------------------- NOT_BUILT stubs
+    # Declared now with their names, classes, input schemas and scope checks, so the
+    # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
+    #   Part 4 (notebook 27): memory_read, memory_propose_write
+    #   Part 6 (notebook 29): watchlist_write, draft_email, request_approval, send_email
+    def not_built(tool, part, scope=None):
+        if catalog.CATALOG[tool][1] is not None:
+            check(tool, scope)
+        failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
+
+    @srv.tool()
+    def memory_read(scope: MandateScope, query: str) -> list[MemoryHit]:
+        """Search the active mandate's memory store (READ, scope: the active mandate only). NOT_BUILT until Part 4."""
+        not_built("memory_read", "Part 4", scope)
+
+    @srv.tool()
+    def memory_propose_write(scope: MandateScope, content: str) -> ProposeWriteResult:
+        """Propose a memory write; its origin comes from the channel, never from the model
+        (INTERNAL_WRITE, scope: the active mandate only). NOT_BUILT until Part 4."""
+        not_built("memory_propose_write", "Part 4", scope)
+
+    @srv.tool()
+    def watchlist_write(scope: MandateScope, draft_id: str, bdc: str, reason: str,
+                        approval_token: str) -> WatchlistWriteResult:
+        """Add a watchlist entry approved by Priya for this exact payload (INTERNAL_WRITE,
+        approve override; scope: the active mandate only). NOT_BUILT until Part 6."""
+        not_built("watchlist_write", "Part 6", scope)
+
+    @srv.tool()
+    def draft_email(scope: MandateScope, to: list[str], subject: str, body: str,
+                    attachments: list[str] | None = None) -> DraftResult:
+        """Draft an email for Priya's approval; nothing is sent (DRAFT, scope: the active
+        mandate only). NOT_BUILT until Part 6."""
+        not_built("draft_email", "Part 6", scope)
+
+    @srv.tool()
+    def request_approval(draft_id: str) -> ApprovalRequest:
+        """Ask Priya to approve a stored draft's exact payload (CONTROL). NOT_BUILT until Part 6."""
+        not_built("request_approval", "Part 6")
+
+    @srv.tool()
+    def send_email(scope: MandateScope, draft_id: str, approval_token: str) -> SendResult:
+        """Send an approved draft to the mock outbox only (EXTERNAL_SEND, approve; scope:
+        the active mandate only). NOT_BUILT until Part 6."""
+        not_built("send_email", "Part 6", scope)
 
     return srv

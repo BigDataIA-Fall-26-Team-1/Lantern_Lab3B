@@ -59,3 +59,34 @@ class WatchlistEntry(BaseModel):
     bdc: str
     reason: str
     added: str
+
+
+# ---- outputs of the tools declared now and built in Part 4 (memory) and Part 6 (actions)
+class MemoryHit(BaseModel):
+    text: str
+    source: str = Field(description="provenance, e.g. log/2026-10-01.md#1")
+
+
+class ProposeWriteResult(BaseModel):
+    result: Literal["written", "proposed"]
+
+
+class WatchlistWriteResult(BaseModel):
+    entry_id: str
+    status: str
+
+
+class DraftResult(BaseModel):
+    draft_id: str
+    payload_hash: str
+
+
+class ApprovalRequest(BaseModel):
+    draft_id: str
+    payload_hash: str
+    status: str
+
+
+class SendResult(BaseModel):
+    message_id: str
+    status: str

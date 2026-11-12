@@ -23,6 +23,21 @@ from services.mcp.server import REGISTRY, build_server  # noqa: E402
 P, USERS, MANDATES = load_config(ROOT)
 BUILT = ["list_mandates", "bdc_holdings", "bdc_signals", "get_filing", "mandate_profile", "watchlist_read"]
 
+# The NOT_BUILT stubs: tool -> (Part that builds it, required inputs, optional inputs, a valid call).
+# Parts 4 and 6 replace these rows with full contract tests; none may remain when those are done.
+NOT_BUILT = {
+    "memory_read": ("Part 4", ["scope", "query"], [], {"scope": "mandate_a", "query": "Golf"}),
+    "memory_propose_write": ("Part 4", ["scope", "content"], [], {"scope": "mandate_a", "content": "x"}),
+    "watchlist_write": ("Part 6", ["scope", "draft_id", "bdc", "reason", "approval_token"], [],
+                        {"scope": "mandate_a", "draft_id": "w-1", "bdc": "FIXTURE GOLF CAPITAL CORP",
+                         "reason": "r", "approval_token": "t"}),
+    "draft_email": ("Part 6", ["scope", "to", "subject", "body"], ["attachments"],
+                    {"scope": "mandate_a", "to": ["cio@harborstate.example"], "subject": "s", "body": "b"}),
+    "request_approval": ("Part 6", ["draft_id"], [], {"draft_id": "d-1"}),
+    "send_email": ("Part 6", ["scope", "draft_id", "approval_token"], [],
+                   {"scope": "mandate_a", "draft_id": "d-1", "approval_token": "t"}),
+}
+
 
 @pytest.fixture
 def srv():
@@ -71,8 +86,8 @@ def test_registry_matches_the_closed_catalog():
 def test_server_registers_only_catalog_tools(srv):
     server, _ = srv
     names = set(tools(server))
-    assert names <= set(REGISTRY)             # never a tool outside the catalog
-    assert names == set(BUILT)                # step 1: the six built READ tools
+    assert names == set(REGISTRY)             # exactly the 12: no tool outside the catalog, none missing
+    assert set(BUILT) | set(NOT_BUILT) == set(REGISTRY)
 
 
 # ---- one contract test per tool
@@ -150,3 +165,19 @@ def test_contract_watchlist_read(srv):
     assert_scope_denied(server, led, "watchlist_read", {"scope": "mandate_b"})
     assert_scope_denied(server, led, "watchlist_read", {"scope": "public"})
     assert "validation error" in error_text(call(server, "watchlist_read", {"scope": None}))
+
+
+# ---- contract tests for the NOT_BUILT stubs: schema, scope first, then the typed NOT_BUILT error
+@pytest.mark.parametrize("tool", sorted(NOT_BUILT))
+def test_contract_not_built_stub(srv, tool):
+    server, led = srv
+    part, required, optional, good = NOT_BUILT[tool]
+    assert_schema(tools(server)[tool], required, optional)
+    text = error_text(call(server, tool, good))
+    assert "NOT_BUILT" in text and part in text
+    assert led.find("tool_call", tool=tool, decision="failed", error="NOT_BUILT")
+    if "scope" in required:                   # the scope check still runs before NOT_BUILT
+        assert_scope_denied(server, led, tool, {**good, "scope": "mandate_b"})
+        assert_scope_denied(server, led, tool, {**good, "scope": "public"})
+    missing = {k: v for k, v in good.items() if k != required[0]}
+    assert "validation error" in error_text(call(server, tool, missing))

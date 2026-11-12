@@ -29,3 +29,9 @@ class HostDenied(ToolError):
 class NotFound(ToolError):
     """No such filing or BDC in the panel."""
     code = "NOT_FOUND"
+
+
+class NotBuilt(ToolError):
+    """A catalog tool declared in Part 1 whose behaviour arrives in a later Part.
+    Every NotBuilt must be gone before notebooks 27 and 29's Your turns are done."""
+    code = "NOT_BUILT"
