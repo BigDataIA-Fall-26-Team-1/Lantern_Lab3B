@@ -1,0 +1,22 @@
+{"action": "hold", "alert_id": "al-51226ca4ac0265d8", "bdc": "FIXTURE GOLF CAPITAL CORP", "mandate": "mandate_a", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-c41308f5be461ee4", "bdc": "FIXTURE GOLF CAPITAL CORP", "mandate": "mandate_a", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-b1ce7ce3af81b7e3", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_a", "rule": "EXTENDED", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-5cb757a32754ed23", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_a", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-6031cc0702b56e96", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_a", "rule": "PIK_UP", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-d06d14719543747a", "bdc": "FIXTURE JULIETT LENDING BDC", "mandate": "mandate_a", "rule": "EXTENDED", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-623b8430811efc5f", "bdc": "FIXTURE JULIETT LENDING BDC", "mandate": "mandate_a", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-c014e64c72d75dd9", "bdc": "FIXTURE JULIETT LENDING BDC", "mandate": "mandate_a", "rule": "PIK_UP", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-5f15e5a8ce4d5da3", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_b", "rule": "EXTENDED", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-25a3fb00e511d204", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_b", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-bb0e05fc05e6f1a3", "bdc": "FIXTURE HOTEL SENIOR LENDING", "mandate": "mandate_b", "rule": "PIK_UP", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-851b2768517ba389", "bdc": "FIXTURE INDIA CREDIT FUND", "mandate": "mandate_b", "rule": "MARKDOWN", "trigger": "release 2026_09", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-e55c00516b8eb937", "bdc": "FIXTURE GOLF CAPITAL CORP", "mandate": "mandate_a", "rule": "FILING", "trigger": "0009000011-26-000111", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-33511c33cba180c5", "bdc": "FIXTURE GOLF CAPITAL CORP", "mandate": "mandate_a", "rule": "FILING", "trigger": "0009000011-26-000109", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "not_material", "bdc": "FIXTURE GOLF CAPITAL CORP", "job": "edgar_watch", "mandate": "mandate_b", "rule": "FILING", "trigger": "0009000011-26-000111", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "not_material", "bdc": "FIXTURE GOLF CAPITAL CORP", "job": "edgar_watch", "mandate": "mandate_b", "rule": "FILING", "trigger": "0009000011-26-000109", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "not_material", "bdc": "FIXTURE INDIA CREDIT FUND", "job": "edgar_watch", "mandate": "mandate_a", "rule": "FILING", "trigger": "0009000013-26-000131", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "not_material", "bdc": "FIXTURE INDIA CREDIT FUND", "job": "edgar_watch", "mandate": "mandate_a", "rule": "FILING", "trigger": "0009000013-26-000130", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-8873a3bafa73d452", "bdc": "FIXTURE INDIA CREDIT FUND", "mandate": "mandate_b", "rule": "FILING", "trigger": "0009000013-26-000131", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hold", "alert_id": "al-59e5bdf431ad4b77", "bdc": "FIXTURE INDIA CREDIT FUND", "mandate": "mandate_b", "rule": "FILING", "trigger": "0009000013-26-000130", "ts": "2026-10-15T06:00:00-04:00"}
+{"action": "hygiene", "due": null, "job": "hygiene", "mandate": "mandate_a", "stale": ["FIXTURE GOLF CAPITAL CORP"], "ts": "2026-10-15T08:00:00-04:00"}
+{"action": "hygiene", "due": null, "job": "hygiene", "mandate": "mandate_b", "stale": [], "ts": "2026-10-15T08:00:00-04:00"}

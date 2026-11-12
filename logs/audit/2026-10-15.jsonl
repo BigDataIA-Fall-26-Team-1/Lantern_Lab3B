@@ -34,3 +34,22 @@
 {"decision": "executed", "event_id": "ev-00034", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
 {"decision": "executed", "event_id": "ev-00035", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
 {"decision": "executed", "event_id": "ev-00036", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-51226ca4ac0265d8", "event_id": "ev-00001", "kind": "alert_held", "mandate": "mandate_a", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-c41308f5be461ee4", "event_id": "ev-00002", "kind": "alert_held", "mandate": "mandate_a", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-b1ce7ce3af81b7e3", "event_id": "ev-00003", "kind": "alert_held", "mandate": "mandate_a", "rule": "EXTENDED", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-5cb757a32754ed23", "event_id": "ev-00004", "kind": "alert_held", "mandate": "mandate_a", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-6031cc0702b56e96", "event_id": "ev-00005", "kind": "alert_held", "mandate": "mandate_a", "rule": "PIK_UP", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-d06d14719543747a", "event_id": "ev-00006", "kind": "alert_held", "mandate": "mandate_a", "rule": "EXTENDED", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-623b8430811efc5f", "event_id": "ev-00007", "kind": "alert_held", "mandate": "mandate_a", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-c014e64c72d75dd9", "event_id": "ev-00008", "kind": "alert_held", "mandate": "mandate_a", "rule": "PIK_UP", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-5f15e5a8ce4d5da3", "event_id": "ev-00009", "kind": "alert_held", "mandate": "mandate_b", "rule": "EXTENDED", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-25a3fb00e511d204", "event_id": "ev-00010", "kind": "alert_held", "mandate": "mandate_b", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-bb0e05fc05e6f1a3", "event_id": "ev-00011", "kind": "alert_held", "mandate": "mandate_b", "rule": "PIK_UP", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-851b2768517ba389", "event_id": "ev-00012", "kind": "alert_held", "mandate": "mandate_b", "rule": "MARKDOWN", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-e55c00516b8eb937", "event_id": "ev-00001", "kind": "alert_held", "mandate": "mandate_a", "rule": "FILING", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-33511c33cba180c5", "event_id": "ev-00002", "kind": "alert_held", "mandate": "mandate_a", "rule": "FILING", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-8873a3bafa73d452", "event_id": "ev-00003", "kind": "alert_held", "mandate": "mandate_b", "rule": "FILING", "ts": "2026-10-15T06:00:00-04:00"}
+{"alert_id": "al-59e5bdf431ad4b77", "event_id": "ev-00004", "kind": "alert_held", "mandate": "mandate_b", "rule": "FILING", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00001", "file": "briefs/2026-10-15-mandate_a.md", "items": 10, "kind": "brief_sent", "mandate": "mandate_a", "text_hash": "438ec8de2722e4293466d3c92955713160074d91b39119d99aa634fc6a548d8e", "ts": "2026-10-15T07:30:00-04:00"}
+{"event_id": "ev-00002", "file": "briefs/2026-10-15-mandate_b.md", "items": 6, "kind": "brief_sent", "mandate": "mandate_b", "text_hash": "d543244e6be69ea1d91ec66953bad5f6593fb2d159d84703d504c5f96be01fe6", "ts": "2026-10-15T07:30:00-04:00"}
+{"event_id": "ev-00001", "file": "hygiene/2026-10-15.md", "kind": "hygiene_sent", "text_hash": "1a1000af25af0601680bb1d0a915ea8c295b7aa63585c7e3d142a351389d748f", "ts": "2026-10-15T08:00:00-04:00"}

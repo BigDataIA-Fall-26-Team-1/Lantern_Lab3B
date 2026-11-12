@@ -1,0 +1,36 @@
+{
+  "alerts_per_mandate_week": {
+    "mandate_a": {
+      "alert": 0,
+      "hold": 10,
+      "total": 10
+    },
+    "mandate_b": {
+      "alert": 0,
+      "hold": 6,
+      "total": 6
+    },
+    "week_ending": "2026-10-15"
+  },
+  "day": "2026-10-15",
+  "idle_cost_per_mandate_month": {
+    "model_usd_per_run": 0.0,
+    "note": "no model calls in the heartbeat; compute and hosting are not modelled",
+    "runs_per_month": {
+      "edgar_watch_dag": 1440,
+      "hygiene_dag": 4,
+      "monthly_brief_dag": 22,
+      "release_watch_dag": 30
+    },
+    "usd": 0.0
+  },
+  "latency": {
+    "filing_accepted_to_delivery_minutes": {
+      "max": 101570.0,
+      "min": 93220.0
+    },
+    "filing_note": "the fixture's EDGAR feed was recorded in August, so this measures the replay; live, a filing is seen within one poll (30 minutes)",
+    "filing_poll_bound_minutes": 30,
+    "release_detected_to_brief_minutes": 90.0
+  }
+}
