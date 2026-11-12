@@ -22,6 +22,9 @@ heartbeat:
   timezone: America/New_York
 approvals:
   ttl_minutes: 30
+actions:                                   # the policy engine (Part 6): action class -> policy, read on every call
+  policy: {READ: auto, DRAFT: auto, INTERNAL_WRITE: notify, EXTERNAL_SEND: approve, CONTROL: principal, DESTRUCTIVE: forbidden}
+  overrides: {watchlist_write: approve}    # clients rely on the watchlist
 sec:
   user_agent: "Your Name your.email@northeastern.edu"   # SEC requires a real name and email
   base_url: "https://www.sec.gov/files/datastandardsinnovation/data/business-development-company-bdc-data-sets/"

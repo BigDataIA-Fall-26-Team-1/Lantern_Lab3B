@@ -16,6 +16,7 @@ from pathlib import Path
 from mcp.server import MCPServer
 
 from creditwatch import catalog, channel, clock, memory, panel, signals
+from services.actions.engine import Engine
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
 from services.memory.store import build_store
@@ -64,14 +65,18 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
     feed = messages if messages is not None else channel_feed(root, P)
     pan = panel_df if panel_df is not None else panel.load_panel(root / P["data"]["panel"])
     materiality = P["heartbeat"]["materiality"]
+    engine = Engine(P, REGISTRY)                           # policies from params.yaml
     srv = MCPServer("creditwatch-tools")
 
-    def check(tool, scope):
-        """The scope kind comes from the catalog; the check runs on EVERY call."""
-        try:
-            channel.require_scope(session, scope, catalog.CATALOG[tool][1], audit)
-        except channel.ScopeError as e:          # require_scope already logged policy_block
-            raise errors.ScopeDenied(str(e)) from e
+    def check(tool, scope=None):
+        """Runs first on EVERY call: the scope check (kind from the catalog), then the
+        policy engine's gate. Returns the tool's policy."""
+        if catalog.CATALOG[tool][1] is not None:
+            try:
+                channel.require_scope(session, scope, catalog.CATALOG[tool][1], audit)
+            except channel.ScopeError as e:      # require_scope already logged policy_block
+                raise errors.ScopeDenied(str(e)) from e
+        return engine.gate(tool, audit, scope)
 
     def done(tool, scope=None):
         audit.record("tool_call", tool=tool, scope=scope, decision="executed")
@@ -84,12 +89,14 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
     @srv.tool()
     def list_mandates() -> MandateList:
         """The mandate ids the logged-in principal serves (READ)."""
+        check("list_mandates")
         done("list_mandates")
         return MandateList(principal=session.principal, mandates=users[session.principal]["mandates"])
 
     @srv.tool()
     def get_filing(adsh: Adsh) -> Filing:
         """One filing's metadata and its SEC link; the link must be an allowed SEC host (READ)."""
+        check("get_filing")
         rows = pan[pan["adsh"] == adsh]
         if rows.empty:
             failed("get_filing", errors.NotFound(f"no filing {adsh!r} in the panel"))
@@ -188,8 +195,7 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
     # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
     #   Part 6 (notebook 29): watchlist_write, draft_email, request_approval, send_email
     def not_built(tool, part, scope=None):
-        if catalog.CATALOG[tool][1] is not None:
-            check(tool, scope)
+        check(tool, scope)
         failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
 
     @srv.tool()
