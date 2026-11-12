@@ -8,6 +8,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +22,7 @@ from services.mcp import schemas  # noqa: E402
 from services.mcp.server import REGISTRY, build_server  # noqa: E402
 
 P, USERS, MANDATES = load_config(ROOT)
+TRUTH = pd.read_csv(ROOT / P["data"]["fixture_dir"] / "ground_truth.csv", dtype=str)
 BUILT = ["list_mandates", "bdc_holdings", "bdc_signals", "get_filing", "mandate_profile", "watchlist_read",
          "memory_read", "memory_propose_write",   # memory tools: contract tests in test_part4_memory.py
          "draft_email", "request_approval", "send_email", "watchlist_write"]   # actions: test_part6_actions.py
@@ -107,7 +109,7 @@ def test_contract_bdc_signals(srv):
     server, led = srv
     assert_schema(tools(server)["bdc_signals"], required=["scope"])
     sig = [schemas.Signal(**s) for s in call(server, "bdc_signals", {"scope": "public"}).structured_content["result"]]
-    assert len(sig) == 6                      # the kit's baseline pairing finds 6 of 9 (notebook 28)
+    assert len(sig) == len(TRUTH)             # our pairing (Part 5) finds every planted event
     assert all(s.adsh and s.row and s.prior_row for s in sig)      # every signal carries its evidence
     crest = next(s for s in sig if "Crestline" in s.identifier)
     assert (crest.rule, crest.before, crest.after, crest.row, crest.prior_row) == ("MARKDOWN", 97.5, 90.0, "103", "503")
@@ -179,7 +181,7 @@ def test_stdio_entry_serves_one_session_from_environment_token():
             return names, sig, other
     names, sig, other = asyncio.run(go())
     assert names == set(REGISTRY)
-    assert len(sig.structured_content["result"]) == 6
+    assert len(sig.structured_content["result"]) == len(TRUTH)
     assert "SCOPE_DENIED" in error_text(other)
 
 

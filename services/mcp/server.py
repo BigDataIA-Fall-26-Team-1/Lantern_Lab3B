@@ -21,6 +21,7 @@ from services.actions.store import ActionStore
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
 from services.memory.store import build_store
+from services.signals.pairing import pair
 from services.mcp.schemas import (Adsh, ApprovalRequest, BdcName, DraftResult, Filing, Holding,
                                   MandateList, MandateProfile, MandateScope, MemoryHit,
                                   ProposeWriteResult, Recipients, Scope, SendResult, Signal,
@@ -144,7 +145,7 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=
     def bdc_signals(scope: Scope) -> list[Signal]:
         """Within-filing credit signals with their evidence: filing, current row, prior row (READ, scope public)."""
         check("bdc_signals", scope)
-        found = signals.find_signals(pan, materiality)        # Part 5 passes our own pairing here
+        found = signals.find_signals(pan, materiality, pair=pair)   # our pairing (Part 5), same rules
         done("bdc_signals", scope)
         return [Signal(**{k: (str(v) if k in ("row", "prior_row") else v) for k, v in s.items()})
                 for s in found.to_dict("records")]

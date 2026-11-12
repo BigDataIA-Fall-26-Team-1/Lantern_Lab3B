@@ -19,6 +19,7 @@ budget:
 heartbeat:
   materiality: {markdown_points: 5.0, pik_points: 0.5, extension_months: 6}
   quiet_hours: {start: 21, end: 7}
+  hygiene: {stale_days: 30, reporting_window_business_days: 5}   # hygiene_dag (HEARTBEAT.md)
   timezone: America/New_York
 approvals:
   ttl_minutes: 30
