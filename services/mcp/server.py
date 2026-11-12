@@ -16,6 +16,7 @@ from mcp.server import MCPServer
 from creditwatch import catalog, channel, panel, signals
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
+from services.memory.store import build_store
 from services.mcp.schemas import (Adsh, ApprovalRequest, BdcName, DraftResult, Filing, Holding,
                                   MandateList, MandateProfile, MandateScope, MemoryHit,
                                   ProposeWriteResult, Scope, SendResult, Signal, WatchlistEntry,
@@ -48,6 +49,7 @@ def build_server(session, audit, root=ROOT, panel_df=None):
     root = Path(root)
     P, users, mandates = load_config(root)
     ws = root / P["agent"]["workspace"]
+    memory_cache = root / ".cache" / "memory"              # rebuildable, git-ignored
     pan = panel_df if panel_df is not None else panel.load_panel(root / P["data"]["panel"])
     materiality = P["heartbeat"]["materiality"]
     srv = MCPServer("creditwatch-tools")
@@ -129,20 +131,28 @@ def build_server(session, audit, root=ROOT, panel_df=None):
         done("watchlist_read", scope)
         return [WatchlistEntry(**m.groupdict()) for m in map(WATCH_LINE.match, text.splitlines()) if m]
 
+    @srv.tool()
+    def memory_read(scope: MandateScope, query: str) -> list[MemoryHit]:
+        """Search the active mandate's own memory store; each hit carries its source
+        (READ, scope: the active mandate only)."""
+        check("memory_read", scope)
+        store = build_store(ws, scope, memory_cache)       # only this mandate's store is ever opened
+        try:
+            hits = store.search(query)
+        finally:
+            store.db.close()
+        done("memory_read", scope)
+        return [MemoryHit(text=t, source=s) for t, s in hits]
+
     # ---------------------------------------------------------------- NOT_BUILT stubs
     # Declared now with their names, classes, input schemas and scope checks, so the
     # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
-    #   Part 4 (notebook 27): memory_read, memory_propose_write
+    #   Part 4 (notebook 27): memory_propose_write
     #   Part 6 (notebook 29): watchlist_write, draft_email, request_approval, send_email
     def not_built(tool, part, scope=None):
         if catalog.CATALOG[tool][1] is not None:
             check(tool, scope)
         failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
-
-    @srv.tool()
-    def memory_read(scope: MandateScope, query: str) -> list[MemoryHit]:
-        """Search the active mandate's memory store (READ, scope: the active mandate only). NOT_BUILT until Part 4."""
-        not_built("memory_read", "Part 4", scope)
 
     @srv.tool()
     def memory_propose_write(scope: MandateScope, content: str) -> ProposeWriteResult:

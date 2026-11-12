@@ -125,17 +125,7 @@ def test_no_part_of_the_context_is_clipped(mandate):
     assert [k for k, r in report.items() if r["clipped"]] == []
 
 
-# ---- 9: open_session refuses to start on a tampered or unlocked skill
-@pytest.fixture
-def scratch_root(tmp_path):
-    """A copy of everything open_session reads: params.yaml, the fixture data, agent/."""
-    shutil.copy(ROOT / "params.yaml", tmp_path / "params.yaml")
-    shutil.copytree(ROOT / "data" / "fixture", tmp_path / "data" / "fixture")
-    shutil.copytree(ROOT / P["agent"]["workspace"], tmp_path / P["agent"]["workspace"],
-                    ignore=shutil.ignore_patterns("__pycache__"))
-    return tmp_path
-
-
+# ---- 9: open_session refuses to start on a tampered or unlocked skill (scratch_root: conftest.py)
 @pytest.mark.parametrize("tamper", [_edit_skill_md, _edit_script, _add_unlocked_skill])
 def test_open_session_refuses_to_start_on_a_tampered_skill(scratch_root, tamper):
     assert open_session("priya", TOKEN, "mandate_a", root=scratch_root)      # the clean copy starts
