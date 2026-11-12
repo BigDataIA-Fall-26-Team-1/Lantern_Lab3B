@@ -205,3 +205,72 @@ def test_memory_ledger_events_store_ids_and_hashes_never_content(scratch_root):
     for t in texts:                                              # no content text anywhere in the ledger
         assert t not in dump
         assert all(w not in dump for w in ("origination", "copy Hotel", "confidential", "never a stress"))
+
+
+# ---- 5: compaction with a diff for review: the dry run writes nothing, --apply writes MEMORY.md
+def _files(root):
+    m = root / "agent" / "mandates"
+    return {p.relative_to(m).as_posix(): p.read_bytes() for p in m.rglob("*") if p.is_file()}
+
+
+def test_compaction_dry_run_shows_the_diff_and_writes_nothing(scratch_root):
+    from services.memory.compact import compact, main
+    ws = scratch_root / "agent"
+    before = _files(scratch_root)
+    diff = compact(ws, "mandate_a", "2026-10-15")
+    assert "+- Harbor State asked for the Golf PIK history before the quarterly call. [log/2026-10-01.md#1]" in diff
+    assert _files(scratch_root) == before                       # nothing written
+
+    printed = []
+    main(["--mandate", "mandate_a"], root=scratch_root, out=printed.append)     # the CLI default is a dry run
+    assert printed[-1].startswith("Dry run: nothing written") and _files(scratch_root) == before
+
+    applied = compact(ws, "mandate_a", "2026-10-15", apply=True)
+    assert applied == diff                                      # --apply writes exactly what was reviewed
+    mem = (ws / "mandates" / "mandate_a" / "MEMORY.md").read_text().splitlines()
+    assert mem == ["# Memory",
+                   "- Harbor State asked for the Golf PIK history before the quarterly call. [log/2026-10-01.md#1]"]
+    assert set(_files(scratch_root)) - set(before) == {"mandate_a/MEMORY.md"}     # only A's MEMORY.md
+    assert compact(ws, "mandate_a", "2026-10-15") == []         # a second run has nothing to change
+
+
+# ---- 6: canary tests over compaction output
+def test_compaction_output_holds_no_other_mandates_content(scratch_root):
+    from services.memory.compact import compact
+    ws = scratch_root / "agent"
+    for m, other_canary in (("mandate_a", "NGM-Quillwort-8830"), ("mandate_b", "HSERS-Tamarind-2291")):
+        diff = compact(ws, m, "2026-10-15", apply=True)
+        mem = (ws / "mandates" / m / "MEMORY.md").read_text()
+        assert leaks([mem, *diff], others(scratch_root, m)) == []
+        assert evals.canary_hits([mem, *diff], [other_canary]) == []
+    b_mem = (ws / "mandates" / "mandate_b" / "MEMORY.md").read_text()
+    assert evals.canary_hits([b_mem], ["NGM-Quillwort-8830"])   # B keeps its OWN hidden canary: memory, not forgetting
+
+
+# ---- 7: canary tests over the assembled context, now with memory in it
+def test_assembled_context_with_memory_holds_no_other_mandates_content(scratch_root):
+    from services.chat.session import open_session
+    from services.memory.compact import compact
+    ws = scratch_root / "agent"
+    for m in ("mandate_a", "mandate_b"):
+        compact(ws, m, "2026-10-15", apply=True)
+    a = open_session("priya", TOKEN, "mandate_a", root=scratch_root)
+    assert "Golf PIK history before the quarterly call. [log/2026-10-01.md#1]" in a.context
+    b = open_session("priya", TOKEN, "mandate_b", root=scratch_root)
+    assert "[log/2026-10-01.md#1]" in b.context and "Reviewed Hotel after the August 10-Q" in b.context
+    for o, m in ((a, "mandate_a"), (b, "mandate_b")):
+        assert leaks([o.context], others(scratch_root, m)) == []
+        assert o.report["memory"]["used"] > 0 and not o.report["memory"]["clipped"]
+
+
+# ---- 8 (rest): recall survives compaction into a later session's context, for that client only
+def test_a_compacted_fact_reaches_the_next_session_of_the_same_client_only(scratch_root):
+    from services.chat.session import open_session
+    from services.memory.compact import compact
+    ws = scratch_root / "agent"
+    fact = "Juliett 10-Q: Crestline price fell from 97.5 to 90.0"
+    ref = memory.append_log(ws / "mandates", "mandate_a", "2026-10-14", fact)    # session 1 logs it
+    compact(ws, "mandate_a", "2026-10-15", apply=True)
+    later = open_session("priya", TOKEN, "mandate_a", root=scratch_root)          # a later session
+    assert f"- {fact} [{ref}]" in later.context
+    assert "Crestline" not in open_session("priya", TOKEN, "mandate_b", root=scratch_root).context

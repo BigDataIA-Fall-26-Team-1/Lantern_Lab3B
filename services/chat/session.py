@@ -54,7 +54,9 @@ def open_session(principal, token, mandate, root=ROOT):
         raise SkillsTampered(str(e)) from None
     s = channel.login(principal, token, mandate, users)
     idx = skills.skill_index(skills.load_skills(ws / "skills"))
-    parts = workspace.load_parts(ws, s.mandate, skills_index=idx)
+    mem = ws / "mandates" / s.mandate / "MEMORY.md"           # this mandate's compacted memory only
+    parts = workspace.load_parts(ws, s.mandate, skills_index=idx,
+                                 memory=mem.read_text(encoding="utf-8") if mem.exists() else "")
     context, report = workspace.assemble(parts, P["context"]["budgets"])
     return OpenSession(s, mandates[s.mandate]["client"], context, report)
 
