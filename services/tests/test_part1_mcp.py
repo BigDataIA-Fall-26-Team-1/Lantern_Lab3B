@@ -181,3 +181,37 @@ def test_contract_not_built_stub(srv, tool):
         assert_scope_denied(server, led, tool, {**good, "scope": "public"})
     missing = {k: v for k, v in good.items() if k != required[0]}
     assert "validation error" in error_text(call(server, tool, missing))
+
+
+# ---- the __main__ stdio entry: the token comes only from the environment
+def _env(**extra):
+    return {"PYTHONPATH": "src", **extra}
+
+
+def test_stdio_entry_serves_one_session_from_environment_token():
+    from mcp import StdioServerParameters
+    params = StdioServerParameters(command=sys.executable, args=["-m", "services.mcp.server"], cwd=str(ROOT),
+                                   env=_env(CREDITWATCH_TOKEN="priya-fixture-token", CREDITWATCH_MANDATE="mandate_a"))
+
+    async def go():
+        async with Client(params) as c:
+            names = {t.name for t in (await c.list_tools()).tools}
+            sig = await c.call_tool("bdc_signals", {"scope": "public"})
+            other = await c.call_tool("mandate_profile", {"scope": "mandate_b"})
+            return names, sig, other
+    names, sig, other = asyncio.run(go())
+    assert names == set(REGISTRY)
+    assert len(sig.structured_content["result"]) == 6
+    assert "SCOPE_DENIED" in error_text(other)
+
+
+@pytest.mark.parametrize("env,code,message", [
+    (_env(CREDITWATCH_TOKEN="guessed", CREDITWATCH_MANDATE="mandate_a"), 1, "login refused: bad credentials"),
+    (_env(CREDITWATCH_MANDATE="mandate_a"), 2, "set CREDITWATCH_TOKEN"),
+])
+def test_stdio_entry_refuses_without_a_good_token(env, code, message):
+    import subprocess
+    r = subprocess.run([sys.executable, "-m", "services.mcp.server"], cwd=ROOT, env=env,
+                       capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+    assert r.returncode == code and message in r.stderr
+    assert r.stdout == "" and "guessed" not in r.stderr          # nothing on the protocol channel; token never echoed

@@ -176,3 +176,33 @@ def build_server(session, audit, root=ROOT, panel_df=None):
         not_built("send_email", "Part 6", scope)
 
     return srv
+
+
+def main():
+    """Run the server over stdio for ONE session. The token is read ONLY from the
+    environment (CREDITWATCH_TOKEN); it is never written to any file or printed.
+    Messages go to stderr, because stdout carries the MCP protocol."""
+    import os
+    import sys
+
+    from creditwatch import audit, clock
+
+    P, users, _ = load_config()
+    principal = os.environ.get("CREDITWATCH_PRINCIPAL", P["agent"]["principal"])
+    token = os.environ.get("CREDITWATCH_TOKEN")
+    mandate = os.environ.get("CREDITWATCH_MANDATE")
+    if not token or not mandate:
+        print("set CREDITWATCH_TOKEN and CREDITWATCH_MANDATE in the environment", file=sys.stderr)
+        sys.exit(2)
+    try:
+        session = channel.login(principal, token, mandate, users)
+    except PermissionError as e:
+        print(f"login refused: {e}", file=sys.stderr)
+        sys.exit(1)
+    del token
+    print(f"creditwatch-tools: {session.principal} on {session.mandate} (stdio)", file=sys.stderr)
+    build_server(session, audit.Ledger(clock=clock.clock)).run("stdio")
+
+
+if __name__ == "__main__":
+    main()
