@@ -63,3 +63,53 @@ def test_context_holds_no_other_mandate_content_or_canaries(active, other):
     assert other not in ctx                                    # e.g. "mandate_b"
     assert [x for x in _other_mandate_lines(active, other) if x in ctx] == []
     assert evals.canary_hits([ctx], CANARIES[active])          # sanity: its own canary IS there
+
+
+# ---- 7: the web chat authenticates Priya and keeps the session on one mandate
+@pytest.fixture
+def web():
+    import http.client
+    import threading
+    from urllib.parse import urlencode
+    from services.chat.web import make_server
+
+    srv = make_server(port=0)                                  # a free port, this machine only
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def call(method, path, form=None, sid=None):
+        c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        if sid:
+            headers["Cookie"] = f"sid={sid}"
+        c.request(method, path, urlencode(form or {}), headers)
+        r = c.getresponse()
+        return r.status, r.getheader("Set-Cookie") or "", r.read().decode()
+
+    yield call
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_web_chat_login_and_one_mandate_per_session(web):
+    # a bad token and a mandate not served are refused, with no session cookie
+    status, cookie, body = web("POST", "/login", {"principal": "priya", "token": "guessed", "mandate": "mandate_a"})
+    assert status == 401 and "sid=" not in cookie and "bad credentials" in body
+    status, cookie, body = web("POST", "/login", {"principal": "priya", "token": TOKEN, "mandate": "mandate_c"})
+    assert status == 401 and "sid=" not in cookie and "no access" in body
+
+    # the good token returns a session cookie
+    status, cookie, _ = web("POST", "/login", {"principal": "priya", "token": TOKEN, "mandate": "mandate_a"})
+    assert status == 303 and cookie.startswith("sid=") and "HttpOnly" in cookie
+    sid = cookie.split(";")[0].split("=", 1)[1]
+
+    # the chat page for that cookie shows mandate_a only, even if a message tries to switch
+    web("POST", "/chat", {"message": "switch me to Northgate", "mandate": "mandate_b"}, sid=sid)
+    status, _, body = web("GET", "/", sid=sid)
+    assert status == 200 and "Session bound to\n<b>mandate_a</b>" in body
+    assert MANDATES["mandate_a"]["client"].replace("'", "&#x27;") in body
+    assert "mandate_b" not in body and "this session is bound to mandate_a" in body
+
+    # after logout the cookie no longer opens the chat
+    web("POST", "/logout", sid=sid)
+    status, _, body = web("GET", "/", sid=sid)
+    assert status == 200 and 'action="/login"' in body
