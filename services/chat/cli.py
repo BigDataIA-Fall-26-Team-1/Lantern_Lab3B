@@ -10,7 +10,7 @@ import argparse
 import getpass
 import sys
 
-from services.chat.session import load_config, open_session, report_lines
+from services.chat.session import SkillsTampered, load_config, open_session, report_lines
 
 PLACEHOLDER = ("(Part 0: this session is bound to {m}. The agent loop that answers "
                "arrives in Part 2.)")
@@ -25,6 +25,9 @@ def main(argv=None, ask=input, ask_secret=getpass.getpass, out=print):
 
     try:
         o = open_session(args.principal, ask_secret("Session token: "), args.mandate)
+    except SkillsTampered as e:
+        out(f"Start-up refused: {e}")
+        return 1
     except PermissionError as e:
         out(f"Login refused: {e}")
         return 1

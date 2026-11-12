@@ -15,7 +15,7 @@ from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
-from services.chat.session import ROOT, load_config, open_session, report_lines
+from services.chat.session import ROOT, SkillsTampered, load_config, open_session, report_lines
 
 PLACEHOLDER = ("(Part 0: this session is bound to {m}. The agent loop that answers "
                "arrives in Part 2.)")
@@ -30,9 +30,9 @@ input,select,button{{font-size:15px;padding:6px;margin:4px 0}}
 </style></head><body><h1>Credit Watch chat</h1>{body}</body></html>"""
 
 
-def _login_form(mandates, principal, error=""):
+def _login_form(mandates, principal, error="", kind="Login"):
     opts = "".join(f'<option value="{html.escape(m)}">{html.escape(m)}</option>' for m in mandates)
-    err = f'<p class="err">Login refused: {html.escape(error)}</p>' if error else ""
+    err = f'<p class="err">{kind} refused: {html.escape(error)}</p>' if error else ""
     return f"""{err}<form method="post" action="/login">
 <label>Principal<br><input name="principal" value="{html.escape(principal)}"></label><br>
 <label>Session token<br><input name="token" type="password" autocomplete="off"></label><br>
@@ -100,6 +100,8 @@ def make_server(host="127.0.0.1", port=8765, root=ROOT):
             if self.path == "/login":
                 try:
                     o = open_session(f.get("principal", ""), f.get("token", ""), f.get("mandate", ""), root)
+                except SkillsTampered as e:
+                    return self._send(503, _login_form(mandates, P["agent"]["principal"], str(e), "Start-up"))
                 except PermissionError as e:
                     return self._send(401, _login_form(mandates, P["agent"]["principal"], str(e)))
                 sid = secrets.token_urlsafe(32)

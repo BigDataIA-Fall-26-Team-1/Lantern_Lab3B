@@ -11,7 +11,7 @@ agent:
   workspace: agent
   principal: priya
 context:
-  budgets: {soul: 300, principal: 400, agents: 300, mandate: 400, watchlist: 200, skills_index: 200, memory: 500}
+  budgets: {soul: 300, principal: 400, agents: 300, mandate: 400, watchlist: 200, skills_index: 320, memory: 500}   # skills_index raised 200 -> 320 for six skills (Part 3)
 budget:
   max_steps_per_task: 8
   usd_cap_per_task: 0.50

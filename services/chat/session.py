@@ -16,6 +16,11 @@ from creditwatch import channel, skills, workspace
 ROOT = Path(__file__).resolve().parents[2]
 
 
+class SkillsTampered(Exception):
+    """Start-up refused: a skill folder differs from skills.lock, is not in it, or
+    the lockfile is missing (tutorial slide 23)."""
+
+
 @dataclass
 class OpenSession:
     session: channel.Session   # principal + the ACTIVE mandate
@@ -34,13 +39,20 @@ def load_config(root=ROOT):
 
 
 def open_session(principal, token, mandate, root=ROOT):
-    """Raises PermissionError on bad credentials or a mandate the principal
-    does not serve. The session stays bound to `mandate`; switching clients
-    means opening a new session."""
+    """Raises SkillsTampered if any skill differs from its pin, and PermissionError
+    on bad credentials or a mandate the principal does not serve. The session
+    stays bound to `mandate`; switching clients means opening a new session."""
     root = Path(root)
     P, users, mandates = load_config(root)
-    s = channel.login(principal, token, mandate, users)
     ws = root / P["agent"]["workspace"]
+    lockfile = ws / "skills" / "skills.lock"
+    try:                                       # refuse to start on a tampered or unlocked skill
+        skills.verify(ws / "skills", json.loads(lockfile.read_text()))
+    except FileNotFoundError:
+        raise SkillsTampered("no skills.lock") from None
+    except RuntimeError as e:
+        raise SkillsTampered(str(e)) from None
+    s = channel.login(principal, token, mandate, users)
     idx = skills.skill_index(skills.load_skills(ws / "skills"))
     parts = workspace.load_parts(ws, s.mandate, skills_index=idx)
     context, report = workspace.assemble(parts, P["context"]["budgets"])
