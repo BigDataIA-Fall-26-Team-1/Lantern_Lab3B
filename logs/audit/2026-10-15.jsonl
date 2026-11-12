@@ -1,0 +1,36 @@
+{"decision": "executed", "event_id": "ev-00001", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00002", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00003", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00004", "kind": "notify", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00005", "file": "PRINCIPAL.md", "kind": "memory_write", "message_id": "msg-101", "scope": "mandate_a", "ts": "2026-10-15T06:00:00-04:00"}
+{"content_hash": "2d09f7455f4a9cc021b26d5b3447471a52463a32211548dd070da67296039239", "decision": "written", "event_id": "ev-00006", "kind": "tool_call", "message_id": "msg-101", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00007", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00008", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00009", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00010", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00011", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00012", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00013", "kind": "notify", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00014", "file": "PRINCIPAL.md", "kind": "memory_write", "message_id": "msg-102", "scope": "mandate_a", "ts": "2026-10-15T06:00:00-04:00"}
+{"content_hash": "ab3ad54e8686d6b17261b1416101d52019181855445563913f32ec025a9e5f6f", "decision": "written", "event_id": "ev-00015", "kind": "tool_call", "message_id": "msg-102", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00016", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00017", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00018", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00019", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00020", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00021", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00022", "kind": "notify", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00023", "file": "PRINCIPAL.md", "kind": "memory_write", "message_id": "msg-103", "scope": "mandate_a", "ts": "2026-10-15T06:00:00-04:00"}
+{"content_hash": "329310f89e104f08591f78658cac23d71cbb070bad828b0c358d6c066abd651c", "decision": "written", "event_id": "ev-00024", "kind": "tool_call", "message_id": "msg-103", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00025", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00026", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00027", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00028", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00029", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00030", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00031", "kind": "notify", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"event_id": "ev-00032", "file": "PRINCIPAL.md", "kind": "memory_write", "message_id": "msg-104", "scope": "mandate_a", "ts": "2026-10-15T06:00:00-04:00"}
+{"content_hash": "74919cc9ce8826799199f578c79335275a2190facddc7e62f7317eac80318baf", "decision": "written", "event_id": "ev-00033", "kind": "tool_call", "message_id": "msg-104", "scope": "mandate_a", "tool": "memory_propose_write", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00034", "kind": "tool_call", "scope": "mandate_a", "tool": "mandate_profile", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00035", "kind": "tool_call", "scope": "public", "tool": "bdc_signals", "ts": "2026-10-15T06:00:00-04:00"}
+{"decision": "executed", "event_id": "ev-00036", "kind": "tool_call", "scope": "public", "tool": "bdc_holdings", "ts": "2026-10-15T06:00:00-04:00"}

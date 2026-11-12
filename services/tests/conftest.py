@@ -20,4 +20,6 @@ def scratch_root(tmp_path):
     shutil.copytree(ROOT / "data" / "fixture", tmp_path / "data" / "fixture")
     for d in (P["agent"]["workspace"], P["agent"]["seed"]):
         shutil.copytree(ROOT / d, tmp_path / d, ignore=shutil.ignore_patterns("__pycache__"))
+    # tests start from the seed's PRINCIPAL.md, even after the real one has learned rules (Part 7 --apply)
+    shutil.copy(tmp_path / P["agent"]["seed"] / "PRINCIPAL.seed.md", tmp_path / P["agent"]["workspace"] / "PRINCIPAL.md")
     return tmp_path
