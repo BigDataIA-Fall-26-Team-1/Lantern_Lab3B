@@ -22,7 +22,8 @@ from services.mcp.server import REGISTRY, build_server  # noqa: E402
 
 P, USERS, MANDATES = load_config(ROOT)
 BUILT = ["list_mandates", "bdc_holdings", "bdc_signals", "get_filing", "mandate_profile", "watchlist_read",
-         "memory_read", "memory_propose_write"]   # memory tools: contract tests in test_part4_memory.py
+         "memory_read", "memory_propose_write",   # memory tools: contract tests in test_part4_memory.py
+         "draft_email", "request_approval"]       # action tools: contract tests in test_part6_actions.py
 
 # The NOT_BUILT stubs: tool -> (Part that builds it, required inputs, optional inputs, a valid call).
 # Parts 4 and 6 replace these rows with full contract tests; none may remain when those are done.
@@ -30,9 +31,6 @@ NOT_BUILT = {
     "watchlist_write": ("Part 6", ["scope", "draft_id", "bdc", "reason", "approval_token"], [],
                         {"scope": "mandate_a", "draft_id": "w-1", "bdc": "FIXTURE GOLF CAPITAL CORP",
                          "reason": "r", "approval_token": "t"}),
-    "draft_email": ("Part 6", ["scope", "to", "subject", "body"], ["attachments"],
-                    {"scope": "mandate_a", "to": ["cio@harborstate.example"], "subject": "s", "body": "b"}),
-    "request_approval": ("Part 6", ["draft_id"], [], {"draft_id": "d-1"}),
     "send_email": ("Part 6", ["scope", "draft_id", "approval_token"], [],
                    {"scope": "mandate_a", "draft_id": "d-1", "approval_token": "t"}),
 }

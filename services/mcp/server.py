@@ -15,15 +15,16 @@ from pathlib import Path
 
 from mcp.server import MCPServer
 
-from creditwatch import catalog, channel, clock, memory, panel, signals
+from creditwatch import approvals, catalog, channel, clock, memory, panel, policy, signals
 from services.actions.engine import Engine
+from services.actions.store import ActionStore
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
 from services.memory.store import build_store
 from services.mcp.schemas import (Adsh, ApprovalRequest, BdcName, DraftResult, Filing, Holding,
                                   MandateList, MandateProfile, MandateScope, MemoryHit,
-                                  ProposeWriteResult, Scope, SendResult, Signal, WatchlistEntry,
-                                  WatchlistWriteResult)
+                                  ProposeWriteResult, Recipients, Scope, SendResult, Signal,
+                                  WatchlistEntry, WatchlistWriteResult)
 
 REGISTRY = {                      # tool -> action class; the closed catalog, nothing else
     "list_mandates": "READ",
@@ -56,13 +57,25 @@ def channel_feed(root, P):
     return {m["message_id"]: m for m in msgs}
 
 
-def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
-    """One server per session: the session's mandate is the only client in reach."""
+def others_of(root, P, mandates, active):
+    """Every OTHER mandate's names, aliases, confidential terms and canaries."""
+    o = policy.confidential_terms(mandates, active)
+    canaries = json.loads((Path(root) / P["data"]["fixture_dir"] / "canaries.json").read_text())
+    o["terms"] = o["terms"] + [c for m, cs in canaries.items() if m != active for c in cs]
+    return o
+
+
+def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=None):
+    """One server per session: the session's mandate is the only client in reach.
+    `store` holds the session's pending drafts; Priya's grant() reads the same one."""
     root = Path(root)
     P, users, mandates = load_config(root)
+    registry = json.loads((root / P["data"]["registry"]).read_text())
+    others = others_of(root, P, mandates, session.mandate)
     ws = root / P["agent"]["workspace"]
     memory_cache = root / ".cache" / "memory"              # rebuildable, git-ignored
     feed = messages if messages is not None else channel_feed(root, P)
+    store = store if store is not None else ActionStore()
     pan = panel_df if panel_df is not None else panel.load_panel(root / P["data"]["panel"])
     materiality = P["heartbeat"]["materiality"]
     engine = Engine(P, REGISTRY)                           # policies from params.yaml
@@ -193,7 +206,7 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
     # ---------------------------------------------------------------- NOT_BUILT stubs
     # Declared now with their names, classes, input schemas and scope checks, so the
     # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
-    #   Part 6 (notebook 29): watchlist_write, draft_email, request_approval, send_email
+    #   Part 6 (notebook 29): watchlist_write, send_email
     def not_built(tool, part, scope=None):
         check(tool, scope)
         failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
@@ -205,17 +218,51 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
         approve override; scope: the active mandate only). NOT_BUILT until Part 6."""
         not_built("watchlist_write", "Part 6", scope)
 
+    # ---------------------------------------------------------------- DRAFT and CONTROL
+    def blocked(tool, rule, why, scope=None, payload=None):
+        extra = {"payload_hash": approvals.payload_hash(payload)} if payload else {}
+        audit.record("policy_block", tool=tool, rule_id=rule, scope=scope, decision="blocked", **extra)
+        raise errors.PolicyBlocked(rule, why)
+
     @srv.tool()
-    def draft_email(scope: MandateScope, to: list[str], subject: str, body: str,
-                    attachments: list[str] | None = None) -> DraftResult:
+    def draft_email(scope: MandateScope, to: Recipients, subject: str, body: str,
+                    attachments: list[str] | None = None, draft_id: str | None = None) -> DraftResult:
         """Draft an email for Priya's approval; nothing is sent (DRAFT, scope: the active
-        mandate only). NOT_BUILT until Part 6."""
-        not_built("draft_email", "Part 6", scope)
+        mandate only). The standing rules run on the draft itself: a draft that breaks one
+        is blocked and never stored. Pass draft_id to revise an existing draft."""
+        check("draft_email", scope)
+        if draft_id is not None:
+            old = store.get(draft_id)
+            if old is None or "to" not in old or old["scope"] != scope:
+                failed("draft_email", errors.NotFound(f"no email draft {draft_id!r} in this session"), scope)
+            if draft_id in store.sent:
+                blocked("draft_email", "R-SENT", f"{draft_id!r} was already sent", scope)
+        payload = {"draft_id": draft_id or store.new_id("d"), "scope": scope, "to": list(to),
+                   "subject": subject, "body": body, "attachments": list(attachments or [])}
+        rule = policy.policy_check(payload, mandates[scope], registry, others)
+        if rule:
+            blocked("draft_email", rule, f"the draft breaks standing rule {rule}", scope, payload)
+        store.put(payload)
+        h = approvals.payload_hash(payload)
+        audit.record("tool_call", tool="draft_email", scope=scope, decision="executed",
+                     draft_id=payload["draft_id"], payload_hash=h)
+        return DraftResult(draft_id=payload["draft_id"], payload_hash=h)
 
     @srv.tool()
     def request_approval(draft_id: str) -> ApprovalRequest:
-        """Ask Priya to approve a stored draft's exact payload (CONTROL). NOT_BUILT until Part 6."""
-        not_built("request_approval", "Part 6")
+        """Ask Priya to approve a stored draft's exact payload (CONTROL). Returns the payload
+        hash she approves; the agent never receives or makes a token."""
+        check("request_approval")
+        payload = store.get(draft_id)
+        if payload is None:
+            failed("request_approval", errors.NotFound(f"no pending draft {draft_id!r} in this session"))
+        if payload["scope"] != session.mandate:
+            raise errors.ScopeDenied(f"draft {draft_id!r} belongs to another mandate")
+        h = approvals.payload_hash(payload)
+        store.requested.add(draft_id)
+        audit.record("approval_requested", tool="request_approval", draft_id=draft_id, payload_hash=h)
+        audit.record("tool_call", tool="request_approval", decision="requested", draft_id=draft_id, payload_hash=h)
+        return ApprovalRequest(draft_id=draft_id, payload_hash=h, status="requested")
 
     @srv.tool()
     def send_email(scope: MandateScope, draft_id: str, approval_token: str) -> SendResult:

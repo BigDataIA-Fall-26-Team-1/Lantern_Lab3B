@@ -88,3 +88,106 @@ def test_an_invalid_params_policy_refuses_to_build(scratch_root):
     set_actions(scratch_root, policy={"READ": "sometimes"})
     with pytest.raises(ValueError, match="sometimes"):
         server_for(scratch_root)
+
+
+# ---- draft_email: the standing rules run on the draft (tutorial slide 35, notebook 29 cell 2)
+import json  # noqa: E402
+
+from creditwatch import approvals  # noqa: E402
+from services.actions.approve import ApprovalRefused, grant  # noqa: E402
+from services.actions.store import ActionStore  # noqa: E402
+
+BODY = "Juliett marked Crestline Roofing down 7.5 points, to 90.0, in its June 10-Q (0009000014-26-000141)."
+REPLY = {"scope": "mandate_a", "to": ["cio@harborstate.example"], "subject": "Juliett after its 10-Q", "body": BODY}
+
+
+def session_server(root, mandate="mandate_a", store=None):
+    """A server plus the session's ActionStore and ledger, so Priya's grant() shares them."""
+    _, users, _ = load_config(root)
+    s = channel.login("priya", TOKEN, mandate, users)
+    led, store = audit.Ledger(clock=clock.clock), store or ActionStore()
+    return build_server(s, led, root=root, store=store), led, store, s
+
+
+def ok(r):
+    assert not r.is_error, r.content
+    return r.structured_content
+
+
+def test_contract_draft_email_stores_a_clean_reply(scratch_root):
+    server, led, store, _ = session_server(scratch_root)
+    d = ok(call(server, "draft_email", REPLY))
+    stored = store.get(d["draft_id"])
+    assert d["draft_id"] == "d-0001" and stored == {**REPLY, "draft_id": "d-0001", "attachments": []}
+    assert d["payload_hash"] == approvals.payload_hash(stored)
+    assert led.find("tool_call", tool="draft_email", decision="executed", payload_hash=d["payload_hash"])
+    assert BODY not in json.dumps(led.events)                                # hashes and ids only
+
+
+@pytest.mark.parametrize("name,change,rule", [
+    ("answers the question about Northgate", {"body": BODY + " Northgate has been adding to Hotel."}, "R-OTHER-MANDATE"),
+    ("obfuscated account code of the other client", {"body": BODY + " Ref NG​-PC 9902."}, "R-OTHER-MANDATE"),
+    ("the other client's hidden canary", {"body": BODY + " NGM-Quillwort 8830"}, "R-OTHER-MANDATE"),
+    ("names a restricted issuer", {"body": BODY + " Ironwood Data Systems is refinancing."}, "R-RESTRICTED"),
+    ("writes to the borrower", {"to": ["cfo@crestlineroofing.example"]}, "R-BORROWER"),
+    ("copies an unknown address", {"to": ["cio@harborstate.example", "me@gmail.example"]}, "R-NOT-CONTACT"),
+])
+def test_a_draft_that_breaks_a_standing_rule_is_blocked_and_never_stored(scratch_root, name, change, rule):
+    server, led, store, _ = session_server(scratch_root)
+    text = error_text(call(server, "draft_email", {**REPLY, **change}))
+    assert "POLICY_BLOCKED" in text and rule in text, name
+    assert led.find("policy_block", tool="draft_email", rule_id=rule, decision="blocked")
+    assert store.pending == {}                                               # never stored: nothing to approve
+    assert change.get("body", "@@") not in json.dumps(led.events)
+
+
+def test_revising_a_draft_changes_its_payload_hash(scratch_root):
+    server, _, store, _ = session_server(scratch_root)
+    d1 = ok(call(server, "draft_email", REPLY))
+    d2 = ok(call(server, "draft_email", {**REPLY, "draft_id": d1["draft_id"],
+                                          "to": ["cio@harborstate.example", "credit.pm@harborstate.example"]}))
+    assert d2["draft_id"] == d1["draft_id"] and d2["payload_hash"] != d1["payload_hash"]
+    assert store.get(d1["draft_id"])["to"] == ["cio@harborstate.example", "credit.pm@harborstate.example"]
+    assert "NOT_FOUND" in error_text(call(server, "draft_email", {**REPLY, "draft_id": "d-0999"}))
+
+
+def test_draft_email_refuses_another_scope_and_bad_input(scratch_root):
+    server, led, store, _ = session_server(scratch_root)
+    for scope in ("mandate_b", "public"):
+        assert "SCOPE_DENIED" in error_text(call(server, "draft_email", {**REPLY, "scope": scope}))
+    assert "validation error" in error_text(call(server, "draft_email", {**REPLY, "to": []}))     # no recipient
+    assert "validation error" in error_text(call(server, "draft_email", {k: v for k, v in REPLY.items() if k != "body"}))
+    assert store.pending == {}
+
+
+# ---- request_approval asks; only Priya's grant() makes a token
+def test_contract_request_approval_asks_and_never_returns_a_token(scratch_root):
+    server, led, store, _ = session_server(scratch_root)
+    d = ok(call(server, "draft_email", REPLY))
+    r = ok(call(server, "request_approval", {"draft_id": d["draft_id"]}))
+    assert r == {"draft_id": d["draft_id"], "payload_hash": d["payload_hash"], "status": "requested"}
+    assert led.find("approval_requested", draft_id=d["draft_id"], payload_hash=d["payload_hash"])
+    assert led.find("tool_call", tool="request_approval", decision="requested")
+    assert "NOT_FOUND" in error_text(call(server, "request_approval", {"draft_id": "d-0999"}))
+    assert "validation error" in error_text(call(server, "request_approval", {}))
+
+
+def test_priya_grants_a_token_for_the_exact_stored_payload(scratch_root):
+    P, _, _ = load_config(scratch_root)
+    server, led, store, s = session_server(scratch_root)
+    d = ok(call(server, "draft_email", REPLY))
+    now = clock.clock().timestamp()
+    with pytest.raises(ApprovalRefused, match="no approval request"):           # a request comes first
+        grant(store, d["draft_id"], s, led, now, P["approvals"]["ttl_minutes"])
+    ok(call(server, "request_approval", {"draft_id": d["draft_id"]}))
+    tok = grant(store, d["draft_id"], s, led, now, P["approvals"]["ttl_minutes"])
+    assert approvals.verify_token(store.get(d["draft_id"]), tok, "priya", now + 60) == "ok"
+    assert led.find("approval_granted", approver="priya", draft_id=d["draft_id"], payload_hash=d["payload_hash"])
+    assert tok not in json.dumps(led.events)                                     # the token is not logged
+
+    _, users, _ = load_config(scratch_root)
+    other = channel.login("priya", TOKEN, "mandate_b", users)                    # another mandate's session
+    with pytest.raises(ApprovalRefused, match="another mandate"):
+        grant(store, d["draft_id"], other, led, now, P["approvals"]["ttl_minutes"])
+    with pytest.raises(ApprovalRefused, match="no pending draft"):
+        grant(store, "d-0999", s, led, now, P["approvals"]["ttl_minutes"])

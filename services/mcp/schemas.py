@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 Scope = Annotated[str, Field(description="'public' for BDC data, or the ACTIVE mandate id for client data")]
 MandateScope = Annotated[str, Field(description="the ACTIVE mandate id; never another mandate, never 'public'")]
 Adsh = Annotated[str, Field(pattern=r"^\d{10}-\d{2}-\d{6}$", description="SEC accession number")]
+Recipients = Annotated[list[str], Field(min_length=1, description="only this mandate's contacts or a BDC's IR address")]
 BdcName = Annotated[str | None, Field(description="exact BDC name as in the panel; omit for all BDCs")]
 
 
