@@ -125,6 +125,9 @@ def brief_job(root=ROOT, now=None):
     written = {}
     for m in mandates:
         items = [a for a in alerts if a["mandate"] == m and a["action"] == "hold" and a["alert_id"] not in briefed]
+        if not items:                                 # nothing new held: never overwrite an earlier brief
+            out.decision({"ts": now.isoformat(), "job": "monthly_brief", "mandate": m, "action": "no_new_items"})
+            continue
         lines = [f"# Release brief for Priya: {m} ({mandates[m]['client']}), {day}", ""]
         for bdc in held[m]:
             sig = [a for a in items if a["bdc"] == bdc and a["rule"] != "FILING"]

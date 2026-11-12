@@ -216,7 +216,10 @@ def test_the_brief_holds_each_clients_own_items_only(scratch_root):
         assert text.count("[0009") == want[m]                               # every item cites its filing
         other_only = set(MANDATES["mandate_b" if m == "mandate_a" else "mandate_a"]["positions"]) - set(MANDATES[m]["positions"])
         assert not any(x.replace("FIXTURE ", "").title() in text for x in other_only)
-    assert brief_job(scratch_root, at(7, 45))["briefs"] == {m: 0 for m in MANDATES}   # nothing briefed twice
+    first = {m: (scratch_root / "outputs" / "heartbeat" / "briefs" / f"2026-10-15-{m}.md").read_text() for m in MANDATES}
+    assert brief_job(scratch_root, at(7, 45))["briefs"] == {}             # nothing briefed twice
+    assert all((scratch_root / "outputs" / "heartbeat" / "briefs" / f"2026-10-15-{m}.md").read_text() == first[m]
+               for m in MANDATES)                                         # and the first briefs are kept
 
 
 def test_no_brief_on_a_day_without_a_release_or_at_the_weekend(scratch_root):
@@ -249,3 +252,82 @@ def test_alert_records_have_every_field_and_pass_the_kits_checks(scratch_root):
     events = jsonl(scratch_root / "logs" / "audit" / "2026-10-15.jsonl")
     assert {e["kind"] for e in events} >= {"alert_held", "alert_sent"}
     assert not any("text" in e for e in events)                             # ids and hashes only
+
+
+# ---- 6, 7, 8: metrics, the DAG files, and the simulated day (scratch copies only)
+import ast  # noqa: E402
+
+from services.heartbeat import run as day_run  # noqa: E402
+
+DAGS = {                     # dag_id -> (schedule from HEARTBEAT.md, the job its task must call)
+    "release_watch_dag": ("0 6 * * *", "release_job"),
+    "edgar_watch_dag": ("*/30 * * * *", "edgar_job"),
+    "monthly_brief_dag": ("30 7 * * 1-5", "brief_job"),
+    "hygiene_dag": ("0 8 * * 1", "hygiene_job"),
+}
+
+
+def snapshot(root):
+    return {p.relative_to(root).as_posix(): p.read_bytes() for d in ("agent", "logs", "outputs", ".cache")
+            for p in (root / d).rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+
+
+def test_the_metrics_of_a_simulated_day(scratch_root):
+    runs, m = day_run.simulate_day(scratch_root, AT)
+    assert m["latency"]["release_detected_to_brief_minutes"] == 90.0          # 06:00 -> 07:30
+    assert m["latency"]["filing_poll_bound_minutes"] == 30
+    held_f, _ = expected_filings()
+    want = {k: n + held_f[k] for k, n in expected_signals().items()}          # all held: 06:00 is quiet hours
+    assert {k: v["total"] for k, v in m["alerts_per_mandate_week"].items() if k != "week_ending"} == want
+    idle = m["idle_cost_per_mandate_month"]
+    assert idle["usd"] == 0.0 and idle["runs_per_month"]["edgar_watch_dag"] == 1440
+    assert json.loads((scratch_root / "outputs" / "heartbeat" / "metrics.json").read_text()) == m
+
+
+@pytest.mark.parametrize("dag_id", sorted(DAGS))
+def test_each_dag_is_thin_and_calls_its_job(dag_id):
+    """Checked without Airflow: the file parses, has the HEARTBEAT.md schedule, and its one task
+    imports and calls only the matching function from services.heartbeat."""
+    schedule, job = DAGS[dag_id]
+    src = (ROOT / "dags" / f"{dag_id}.py").read_text()
+    tree = ast.parse(src)
+    deco = next(d for f in tree.body if isinstance(f, ast.FunctionDef) for d in f.decorator_list
+                if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "dag")
+    kw = {k.arg: k.value for k in deco.keywords}
+    assert ast.literal_eval(kw["dag_id"]) == dag_id and ast.literal_eval(kw["schedule"]) == schedule
+    assert ast.literal_eval(kw["catchup"]) is False
+    imports = [n for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == "services.heartbeat"]
+    assert [a.name for n in imports for a in n.names] == [job]
+    calls = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    assert job in calls
+    assert dag_id.replace("_dag", "") in (ROOT / "agent" / "HEARTBEAT.md").read_text()   # named in HEARTBEAT.md
+
+
+def test_the_dry_run_writes_nothing_and_apply_writes_exactly_the_heartbeat_files(scratch_root):
+    before = snapshot(scratch_root)
+    printed = []
+    assert day_run.main(["--force-hygiene"], root=scratch_root, out=printed.append) == 0
+    assert snapshot(scratch_root) == before and printed[-1].startswith("Dry run")
+
+    assert day_run.main(["--apply", "--force-hygiene"], root=scratch_root, out=printed.append) == 0
+    after = snapshot(scratch_root)
+    changed = {f for f in after if before.get(f) != after[f]}
+    assert changed == {"outputs/heartbeat/alerts.jsonl", "outputs/heartbeat/decisions.jsonl",
+                       "outputs/heartbeat/briefs/2026-10-15-mandate_a.md",
+                       "outputs/heartbeat/briefs/2026-10-15-mandate_b.md",
+                       "outputs/heartbeat/hygiene/2026-10-15.md", "outputs/heartbeat/metrics.json",
+                       "logs/audit/2026-10-15.jsonl", ".cache/heartbeat/state.json"}
+
+    frozen = snapshot(scratch_root)
+    assert day_run.main(["--apply"], root=scratch_root, out=printed.append) == 1     # the same day again
+    assert printed[-1].startswith("Refused") and snapshot(scratch_root) == frozen   # nothing duplicated
+
+
+def test_after_apply_the_kits_alert_lines_pass_on_the_scratch_copy(scratch_root):
+    from creditwatch.check import run_checks
+    day_run.simulate_day(scratch_root, AT)
+    res = {name: (ok, detail) for name, ok, detail in run_checks(scratch_root)}
+    assert res["outputs/heartbeat/alerts.jsonl: one alert per line, all fields"][0]
+    assert res["every alert goes only to a mandate that holds its BDC"][0]
+    iso = res["no alert or task output names, codes or canaries another mandate"]
+    assert not iso[0] and "tasks/dev.jsonl" in iso[1]                         # waits for Part 8's task outputs
