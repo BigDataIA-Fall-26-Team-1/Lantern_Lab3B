@@ -7,13 +7,15 @@ checks its scope on every call with the kit's channel.require_scope (or
 require_host) and records a ledger event. On the fixture the READ tools wrap
 the kit's panel and signals functions, so results match the notebooks.
 """
+import hashlib
+import json
 import math
 import re
 from pathlib import Path
 
 from mcp.server import MCPServer
 
-from creditwatch import catalog, channel, panel, signals
+from creditwatch import catalog, channel, clock, memory, panel, signals
 from services.chat.session import ROOT, load_config
 from services.mcp import errors
 from services.memory.store import build_store
@@ -44,12 +46,22 @@ def _num(x):
     return None if x is None or (isinstance(x, float) and math.isnan(x)) else float(x)
 
 
-def build_server(session, audit, root=ROOT, panel_df=None):
+def channel_feed(root, P):
+    """The channel's recorded messages on the fixture: Priya's corrections (with her
+    session token) and the inbox (client and IR email). message_id -> message."""
+    fx = Path(root) / P["data"]["fixture_dir"]
+    msgs = [json.loads(x) for f in ("corrections.jsonl", "inbox.jsonl")
+            for x in (fx / f).read_text(encoding="utf-8").splitlines() if x.strip()]
+    return {m["message_id"]: m for m in msgs}
+
+
+def build_server(session, audit, root=ROOT, panel_df=None, messages=None):
     """One server per session: the session's mandate is the only client in reach."""
     root = Path(root)
     P, users, mandates = load_config(root)
     ws = root / P["agent"]["workspace"]
     memory_cache = root / ".cache" / "memory"              # rebuildable, git-ignored
+    feed = messages if messages is not None else channel_feed(root, P)
     pan = panel_df if panel_df is not None else panel.load_panel(root / P["data"]["panel"])
     materiality = P["heartbeat"]["materiality"]
     srv = MCPServer("creditwatch-tools")
@@ -144,21 +156,41 @@ def build_server(session, audit, root=ROOT, panel_df=None):
         done("memory_read", scope)
         return [MemoryHit(text=t, source=s) for t, s in hits]
 
+    # ---------------------------------------------------------------- INTERNAL_WRITE
+    @srv.tool()
+    def memory_propose_write(scope: MandateScope, content: str,
+                             message_id: str | None = None) -> ProposeWriteResult:
+        """Propose a standing rule or memory (INTERNAL_WRITE, scope: the active mandate only).
+        Written to PRINCIPAL.md ONLY when message_id is Priya's authenticated message and
+        content is exactly what she sent; anything else becomes a proposal for her review."""
+        check("memory_propose_write", scope)
+        msg = None
+        if message_id is not None:
+            msg = feed.get(message_id)
+            if msg is None:
+                failed("memory_propose_write", errors.NotFound(f"no message {message_id!r} on the channel"), scope)
+        if msg is None:
+            origin = "model"                                # the caller's own idea
+        elif channel.authority(msg, users) != "instruction":
+            origin = "email"                                # data: client email, IR notes, filings
+        elif msg.get("content") != content:
+            origin = "model"                                # Priya's id, but words she did not send
+        else:
+            origin = "principal"
+        result = memory.propose_write(scope, content, origin, message_id if origin == "principal" else None,
+                                      audit, ws / "PRINCIPAL.md", ws / "proposals", clock.clock().date().isoformat())
+        audit.record("tool_call", tool="memory_propose_write", scope=scope, decision=result,
+                     message_id=message_id, content_hash=hashlib.sha256(content.encode()).hexdigest())
+        return ProposeWriteResult(result=result, origin=origin)
+
     # ---------------------------------------------------------------- NOT_BUILT stubs
     # Declared now with their names, classes, input schemas and scope checks, so the
     # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
-    #   Part 4 (notebook 27): memory_propose_write
     #   Part 6 (notebook 29): watchlist_write, draft_email, request_approval, send_email
     def not_built(tool, part, scope=None):
         if catalog.CATALOG[tool][1] is not None:
             check(tool, scope)
         failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
-
-    @srv.tool()
-    def memory_propose_write(scope: MandateScope, content: str) -> ProposeWriteResult:
-        """Propose a memory write; its origin comes from the channel, never from the model
-        (INTERNAL_WRITE, scope: the active mandate only). NOT_BUILT until Part 4."""
-        not_built("memory_propose_write", "Part 4", scope)
 
     @srv.tool()
     def watchlist_write(scope: MandateScope, draft_id: str, bdc: str, reason: str,

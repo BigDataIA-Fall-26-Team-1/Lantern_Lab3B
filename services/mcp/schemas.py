@@ -69,6 +69,8 @@ class MemoryHit(BaseModel):
 
 class ProposeWriteResult(BaseModel):
     result: Literal["written", "proposed"]
+    origin: Literal["principal", "email", "model"] = Field(
+        description="decided by the channel's authentication, never by the caller")
 
 
 class WatchlistWriteResult(BaseModel):

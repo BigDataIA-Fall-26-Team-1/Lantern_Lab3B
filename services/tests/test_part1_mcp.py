@@ -22,12 +22,11 @@ from services.mcp.server import REGISTRY, build_server  # noqa: E402
 
 P, USERS, MANDATES = load_config(ROOT)
 BUILT = ["list_mandates", "bdc_holdings", "bdc_signals", "get_filing", "mandate_profile", "watchlist_read",
-         "memory_read"]                       # memory_read: contract test in test_part4_memory.py
+         "memory_read", "memory_propose_write"]   # memory tools: contract tests in test_part4_memory.py
 
 # The NOT_BUILT stubs: tool -> (Part that builds it, required inputs, optional inputs, a valid call).
 # Parts 4 and 6 replace these rows with full contract tests; none may remain when those are done.
 NOT_BUILT = {
-    "memory_propose_write": ("Part 4", ["scope", "content"], [], {"scope": "mandate_a", "content": "x"}),
     "watchlist_write": ("Part 6", ["scope", "draft_id", "bdc", "reason", "approval_token"], [],
                         {"scope": "mandate_a", "draft_id": "w-1", "bdc": "FIXTURE GOLF CAPITAL CORP",
                          "reason": "r", "approval_token": "t"}),
