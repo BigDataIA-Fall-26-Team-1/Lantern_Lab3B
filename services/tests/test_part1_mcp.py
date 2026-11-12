@@ -23,17 +23,7 @@ from services.mcp.server import REGISTRY, build_server  # noqa: E402
 P, USERS, MANDATES = load_config(ROOT)
 BUILT = ["list_mandates", "bdc_holdings", "bdc_signals", "get_filing", "mandate_profile", "watchlist_read",
          "memory_read", "memory_propose_write",   # memory tools: contract tests in test_part4_memory.py
-         "draft_email", "request_approval"]       # action tools: contract tests in test_part6_actions.py
-
-# The NOT_BUILT stubs: tool -> (Part that builds it, required inputs, optional inputs, a valid call).
-# Parts 4 and 6 replace these rows with full contract tests; none may remain when those are done.
-NOT_BUILT = {
-    "watchlist_write": ("Part 6", ["scope", "draft_id", "bdc", "reason", "approval_token"], [],
-                        {"scope": "mandate_a", "draft_id": "w-1", "bdc": "FIXTURE GOLF CAPITAL CORP",
-                         "reason": "r", "approval_token": "t"}),
-    "send_email": ("Part 6", ["scope", "draft_id", "approval_token"], [],
-                   {"scope": "mandate_a", "draft_id": "d-1", "approval_token": "t"}),
-}
+         "draft_email", "request_approval", "send_email", "watchlist_write"]   # actions: test_part6_actions.py
 
 
 @pytest.fixture
@@ -84,7 +74,7 @@ def test_server_registers_only_catalog_tools(srv):
     server, _ = srv
     names = set(tools(server))
     assert names == set(REGISTRY)             # exactly the 12: no tool outside the catalog, none missing
-    assert set(BUILT) | set(NOT_BUILT) == set(REGISTRY)
+    assert set(BUILT) == set(REGISTRY)
 
 
 # ---- one contract test per tool
@@ -164,20 +154,11 @@ def test_contract_watchlist_read(srv):
     assert "validation error" in error_text(call(server, "watchlist_read", {"scope": None}))
 
 
-# ---- contract tests for the NOT_BUILT stubs: schema, scope first, then the typed NOT_BUILT error
-@pytest.mark.parametrize("tool", sorted(NOT_BUILT))
-def test_contract_not_built_stub(srv, tool):
-    server, led = srv
-    part, required, optional, good = NOT_BUILT[tool]
-    assert_schema(tools(server)[tool], required, optional)
-    text = error_text(call(server, tool, good))
-    assert "NOT_BUILT" in text and part in text
-    assert led.find("tool_call", tool=tool, decision="failed", error="NOT_BUILT")
-    if "scope" in required:                   # the scope check still runs before NOT_BUILT
-        assert_scope_denied(server, led, tool, {**good, "scope": "mandate_b"})
-        assert_scope_denied(server, led, tool, {**good, "scope": "public"})
-    missing = {k: v for k, v in good.items() if k != required[0]}
-    assert "validation error" in error_text(call(server, tool, missing))
+# ---- every catalog tool is built: no NOT_BUILT stub may ever come back
+def test_no_not_built_stub_is_left():
+    for f in ("server.py", "errors.py"):
+        src = (ROOT / "services" / "mcp" / f).read_text()
+        assert "NOT_BUILT" not in src and "NotBuilt" not in src and "not_built" not in src, f
 
 
 # ---- the __main__ stdio entry: the token comes only from the environment

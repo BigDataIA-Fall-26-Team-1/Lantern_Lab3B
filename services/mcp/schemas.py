@@ -10,6 +10,9 @@ Scope = Annotated[str, Field(description="'public' for BDC data, or the ACTIVE m
 MandateScope = Annotated[str, Field(description="the ACTIVE mandate id; never another mandate, never 'public'")]
 Adsh = Annotated[str, Field(pattern=r"^\d{10}-\d{2}-\d{6}$", description="SEC accession number")]
 Recipients = Annotated[list[str], Field(min_length=1, description="only this mandate's contacts or a BDC's IR address")]
+# watchlist lines are "- BDC: reason (added YYYY-MM-DD)": one line, and no ':' in the BDC name, so they parse back
+WatchBdc = Annotated[str, Field(pattern=r"^[^\n:]+$", description="exact BDC name, as in the panel")]
+WatchReason = Annotated[str, Field(pattern=r"^[^\n]+$", description="one line: the signal, in points, citing the accession")]
 BdcName = Annotated[str | None, Field(description="exact BDC name as in the panel; omit for all BDCs")]
 
 
@@ -62,7 +65,7 @@ class WatchlistEntry(BaseModel):
     added: str
 
 
-# ---- outputs of the tools declared now and built in Part 4 (memory) and Part 6 (actions)
+# ---- outputs of the memory tools (Part 4) and the action tools (Part 6)
 class MemoryHit(BaseModel):
     text: str
     source: str = Field(description="provenance, e.g. log/2026-10-01.md#1")
@@ -75,8 +78,8 @@ class ProposeWriteResult(BaseModel):
 
 
 class WatchlistWriteResult(BaseModel):
-    entry_id: str
-    status: str
+    entry_id: str | None = Field(description="set once the entry is written")
+    status: Literal["requested", "written"]
 
 
 class DraftResult(BaseModel):

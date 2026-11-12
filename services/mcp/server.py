@@ -24,7 +24,7 @@ from services.memory.store import build_store
 from services.mcp.schemas import (Adsh, ApprovalRequest, BdcName, DraftResult, Filing, Holding,
                                   MandateList, MandateProfile, MandateScope, MemoryHit,
                                   ProposeWriteResult, Recipients, Scope, SendResult, Signal,
-                                  WatchlistEntry, WatchlistWriteResult)
+                                  WatchBdc, WatchlistEntry, WatchlistWriteResult, WatchReason)
 
 REGISTRY = {                      # tool -> action class; the closed catalog, nothing else
     "list_mandates": "READ",
@@ -65,10 +65,13 @@ def others_of(root, P, mandates, active):
     return o
 
 
-def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=None):
+def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=None, now=None):
     """One server per session: the session's mandate is the only client in reach.
-    `store` holds the session's pending drafts; Priya's grant() reads the same one."""
+    `store` holds the session's pending drafts; Priya's grant() reads the same one.
+    `now` returns epoch seconds for token expiry (default: the injected LANTERN_CLOCK)."""
     root = Path(root)
+    now = now or (lambda: clock.clock().timestamp())
+    outbox = root / "outputs" / "outbox"                   # the MOCK outbox: never real email
     P, users, mandates = load_config(root)
     registry = json.loads((root / P["data"]["registry"]).read_text())
     others = others_of(root, P, mandates, session.mandate)
@@ -203,25 +206,13 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=
                      message_id=message_id, content_hash=hashlib.sha256(content.encode()).hexdigest())
         return ProposeWriteResult(result=result, origin=origin)
 
-    # ---------------------------------------------------------------- NOT_BUILT stubs
-    # Declared now with their names, classes, input schemas and scope checks, so the
-    # catalog is complete. Each checks scope FIRST, then raises NotBuilt.
-    #   Part 6 (notebook 29): watchlist_write, send_email
-    def not_built(tool, part, scope=None):
-        check(tool, scope)
-        failed(tool, errors.NotBuilt(f"{tool} arrives in {part}"), scope)
-
-    @srv.tool()
-    def watchlist_write(scope: MandateScope, draft_id: str, bdc: str, reason: str,
-                        approval_token: str) -> WatchlistWriteResult:
-        """Add a watchlist entry approved by Priya for this exact payload (INTERNAL_WRITE,
-        approve override; scope: the active mandate only). NOT_BUILT until Part 6."""
-        not_built("watchlist_write", "Part 6", scope)
-
     # ---------------------------------------------------------------- DRAFT and CONTROL
-    def blocked(tool, rule, why, scope=None, payload=None):
+    def blocked(tool, rule, why, scope=None, payload=None, reason=None):
         extra = {"payload_hash": approvals.payload_hash(payload)} if payload else {}
+        if reason:
+            extra["reason"] = reason
         audit.record("policy_block", tool=tool, rule_id=rule, scope=scope, decision="blocked", **extra)
+        audit.record("tool_call", tool=tool, scope=scope, decision="blocked", rule_id=rule)
         raise errors.PolicyBlocked(rule, why)
 
     @srv.tool()
@@ -243,6 +234,7 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=
         if rule:
             blocked("draft_email", rule, f"the draft breaks standing rule {rule}", scope, payload)
         store.put(payload)
+        store.requested.discard(payload["draft_id"])        # a revised draft needs a new request
         h = approvals.payload_hash(payload)
         audit.record("tool_call", tool="draft_email", scope=scope, decision="executed",
                      draft_id=payload["draft_id"], payload_hash=h)
@@ -264,11 +256,76 @@ def build_server(session, audit, root=ROOT, panel_df=None, messages=None, store=
         audit.record("tool_call", tool="request_approval", decision="requested", draft_id=draft_id, payload_hash=h)
         return ApprovalRequest(draft_id=draft_id, payload_hash=h, status="requested")
 
+    # ---------------------------------------------------------------- EXTERNAL_SEND
     @srv.tool()
-    def send_email(scope: MandateScope, draft_id: str, approval_token: str) -> SendResult:
-        """Send an approved draft to the mock outbox only (EXTERNAL_SEND, approve; scope:
-        the active mandate only). NOT_BUILT until Part 6."""
-        not_built("send_email", "Part 6", scope)
+    def send_email(scope: MandateScope, draft_id: str, approval_token: str | None = None) -> SendResult:
+        """Send a stored draft to the MOCK outbox (outputs/outbox/) only (EXTERNAL_SEND, approve;
+        scope: the active mandate only). Needs Priya's token for the exact stored payload; a
+        draft is sent once. The standing rules run again before the send."""
+        check("send_email", scope)
+        payload = store.get(draft_id)
+        if payload is None or "to" not in payload or payload["scope"] != scope:
+            failed("send_email", errors.NotFound(f"no email draft {draft_id!r} in this session"), scope)
+        if draft_id in store.sent:
+            blocked("send_email", "R-SENT", f"{draft_id!r} was already sent", scope, payload)
+        if not approval_token:
+            blocked("send_email", "R-APPROVAL", "no approval token: request_approval first", scope, payload)
+        verdict = approvals.verify_token(payload, approval_token, session.principal, now())
+        if verdict != "ok":                                   # payload_changed, expired, wrong_approver, malformed
+            blocked("send_email", "R-TOKEN", f"approval token refused: {verdict}", scope, payload, verdict)
+        rule = policy.policy_check(payload, mandates[scope], registry, others)
+        if rule:
+            blocked("send_email", rule, f"the draft breaks standing rule {rule}", scope, payload)
+        outbox.mkdir(parents=True, exist_ok=True)
+        message_id = f"mock-{len(list(outbox.glob('mock-*.json'))) + 1:04d}"
+        h = approvals.payload_hash(payload)
+        (outbox / f"{message_id}.json").write_text(json.dumps(
+            {"message_id": message_id, "draft_id": draft_id, "payload_hash": h, "to": payload["to"],
+             "subject": payload["subject"], "body": payload["body"], "attachments": payload["attachments"]},
+            indent=2), encoding="utf-8")
+        store.sent.add(draft_id)
+        audit.record("tool_call", tool="send_email", scope=scope, decision="executed",
+                     draft_id=draft_id, message_id=message_id, payload_hash=h)
+        return SendResult(message_id=message_id, status="sent")
+
+    # ---------------------------------------------------------------- INTERNAL_WRITE, approve override
+    @srv.tool()
+    def watchlist_write(scope: MandateScope, draft_id: str, bdc: WatchBdc, reason: WatchReason,
+                        approval_token: str | None = None) -> WatchlistWriteResult:
+        """Add an entry to the active client's watchlist (INTERNAL_WRITE with an approve override:
+        clients rely on it; scope: the active mandate only). Without a token the entry is stored
+        and status is 'requested': call request_approval. With Priya's token for exactly
+        {draft_id, scope, bdc, reason}, the line '- BDC: reason (added YYYY-MM-DD)' is written."""
+        check("watchlist_write", scope)
+        payload = {"draft_id": draft_id, "scope": scope, "bdc": bdc, "reason": reason}
+        if draft_id in store.sent:
+            blocked("watchlist_write", "R-SENT", f"{draft_id!r} was already written", scope, payload)
+        text = f"{bdc} {reason}"
+        if policy.mentions(text, others["names"]) or policy.leaks(text, others["terms"]):
+            blocked("watchlist_write", "R-OTHER-MANDATE", "the entry names another client", scope, payload)
+        if policy.mentions(text, registry["restricted"]):
+            blocked("watchlist_write", "R-RESTRICTED", "the entry names a restricted issuer", scope, payload)
+        h = approvals.payload_hash(payload)
+        if not approval_token:                                 # dev-06: requested, never executed
+            store.put(payload)
+            store.requested.discard(draft_id)
+            audit.record("tool_call", tool="watchlist_write", scope=scope, decision="requested",
+                         draft_id=draft_id, payload_hash=h)
+            return WatchlistWriteResult(entry_id=None, status="requested")
+        verdict = approvals.verify_token(payload, approval_token, session.principal, now())
+        if verdict != "ok":                                    # e.g. the reason was edited after approval
+            blocked("watchlist_write", "R-TOKEN", f"approval token refused: {verdict}", scope, payload, verdict)
+        path = ws / "mandates" / scope / "WATCHLIST.md"
+        lines = [x for x in path.read_text(encoding="utf-8").splitlines() if x.strip() != "(no entries)"]
+        line = f"- {bdc}: {reason} (added {clock.clock().date().isoformat()})"
+        if not WATCH_LINE.match(line):                         # always readable by watchlist_read
+            blocked("watchlist_write", "R-FORMAT", "the entry would not parse as a watchlist line", scope, payload)
+        path.write_text("\n".join([*lines, line]) + "\n", encoding="utf-8")
+        store.sent.add(draft_id)
+        entry_id = f"wl-{h[:12]}"
+        audit.record("tool_call", tool="watchlist_write", scope=scope, decision="executed",
+                     draft_id=draft_id, entry_id=entry_id, payload_hash=h)
+        return WatchlistWriteResult(entry_id=entry_id, status="written")
 
     return srv
 
