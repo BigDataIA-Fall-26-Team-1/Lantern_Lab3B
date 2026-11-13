@@ -1,0 +1,8 @@
+#!/bin/sh
+# The lantern command (Part 8). From the repo root:
+#   ./lantern eval run --suite dev --mode replay [--apply]
+# Uses the project's .venv when it exists. The session token comes from CREDITWATCH_TOKEN.
+cd "$(dirname "$0")" || exit 1
+PY=.venv/bin/python
+[ -x "$PY" ] || PY=python
+PYTHONPATH=src exec "$PY" -m services.evals.cli "$@"

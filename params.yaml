@@ -36,3 +36,7 @@ prices:                                    # illustrative: replace with your pro
 economics:                                 # assumptions: state and justify your own
   analyst_hours_per_review: 3.0
   analyst_rate_usd: 120.0
+  # Part 8 assumptions (stated, not measured): one monthly release, so per mandate-month
+  tasks_per_mandate_month: {client_note: 1, bdc_review_per_held_bdc: 1, brief: 1}
+  false_alert_minutes: 15                  # ASSUMPTION: Priya's time lost per false alert
+  leak_cost_usd: 250000                    # ASSUMPTION, a placeholder: legal review, client remediation, relationship risk

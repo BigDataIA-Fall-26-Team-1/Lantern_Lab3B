@@ -1,0 +1,118 @@
+{
+  "approvals": [
+    {
+      "approver": "priya",
+      "draft_id": "d-0001",
+      "payload_hash": "9705ccc218b74b55371b38f4ee24ed62db513a296cdae230afd5a4d4045f59b0",
+      "step": "client note"
+    },
+    {
+      "approver": "priya",
+      "draft_id": "w-0001",
+      "payload_hash": "e6f770ed9180fdd6b4aa542b0c5a94b9b2ec70e35501ffe0e4a47dc4a03b37c1",
+      "step": "watchlist entry"
+    }
+  ],
+  "canary_scan": {
+    "other_mandate_hits": [],
+    "scanned": [
+      "outbox message",
+      "watchlist entry"
+    ]
+  },
+  "capstone": {
+    "approved_hash": "9705ccc218b74b55371b38f4ee24ed62db513a296cdae230afd5a4d4045f59b0",
+    "draft_id": "d-0001",
+    "reason": "payload_changed",
+    "rule_id": "R-TOKEN",
+    "sent": false,
+    "swapped": "marked down -> marked lower"
+  },
+  "day": "2026-10-15",
+  "mandate": "mandate_a",
+  "note_follows_learned_rules": {
+    "msg-101": true,
+    "msg-102": true,
+    "msg-103": true,
+    "msg-104": true
+  },
+  "outbox_message_id": "mock-0001",
+  "scenario": "release_morning",
+  "sent_note": "Your exposure: Golf Capital Corp $42.0m, Hotel Senior Lending $18.0m, Juliett Lending BDC $35.5m\nGolf Capital Corp: Cedar Ridge Dental Partners LLC marked down 6.5 points (98.0 to 91.5) [0009000011-26-000111]\nGolf Capital Corp: Granite Peak Manufacturing LLC marked down 6.5 points (98.5 to 92.0) [0009000011-26-000111]\nHotel Senior Lending: Pinecrest Learning Group Inc., First Lien Term Loan maturity extended from 2029-09-30 to 2031-09-30 [0009000012-26-000121]\nHotel Senior Lending: Brightwater Fitness Holdings LLC, First Lien Term Loan marked down 5.5 points (99.0 to 93.5) [0009000012-26-000121]\nHotel Senior Lending: Oakmont Home Services LLC, First Lien Term Loan PIK up from 1.00% to 3.00% [0009000012-26-000121]\nJuliett Lending BDC: Dunmore Insurance Brokers LLC maturity extended from 2028-03-15 to 2030-03-15 [0009000014-26-000141]\nJuliett Lending BDC: Crestline Roofing Holdings LLC marked down 7.5 points (97.5 to 90.0) [0009000014-26-000141]\nJuliett Lending BDC: Foxglove Specialty Pharma Inc. PIK up from 0.00% to 2.50% [0009000014-26-000141]",
+  "sent_payload_hash": "9705ccc218b74b55371b38f4ee24ed62db513a296cdae230afd5a4d4045f59b0",
+  "steps": [
+    {
+      "published": true,
+      "release": "2026_09",
+      "routed": {
+        "mandate_a": {
+          "action": [
+            "hold"
+          ],
+          "n": 8
+        },
+        "mandate_b": {
+          "action": [
+            "hold"
+          ],
+          "n": 4
+        }
+      },
+      "step": "release tick",
+      "time": "06:00"
+    },
+    {
+      "routed": {
+        "mandate_a": 2,
+        "mandate_b": 2
+      },
+      "step": "edgar watch",
+      "time": "06:00"
+    },
+    {
+      "briefs": {
+        "mandate_a": 10,
+        "mandate_b": 6
+      },
+      "step": "brief for Priya",
+      "time": "07:30"
+    },
+    {
+      "decisions": [
+        "mandate_profile executed",
+        "bdc_signals executed",
+        "bdc_holdings executed",
+        "draft_email executed",
+        "request_approval requested",
+        "send_email executed"
+      ],
+      "outbox_message_id": "mock-0001",
+      "step": "client note: draft, approval, send",
+      "time": "07:32"
+    },
+    {
+      "decisions": [
+        "mandate_profile executed",
+        "bdc_signals executed",
+        "watchlist_write requested",
+        "request_approval requested",
+        "watchlist_write executed"
+      ],
+      "step": "watchlist entry: request, approval, write",
+      "time": "07:34",
+      "watchlist_entry_id": "wl-e6f770ed9180"
+    },
+    {
+      "approved_hash": "9705ccc218b74b55371b38f4ee24ed62db513a296cdae230afd5a4d4045f59b0",
+      "draft_id": "d-0001",
+      "reason": "payload_changed",
+      "rule_id": "R-TOKEN",
+      "sent": false,
+      "step": "capstone: one word swapped after approval",
+      "swapped": "marked down -> marked lower",
+      "time": "07:36"
+    }
+  ],
+  "watchlist_entry_id": "wl-e6f770ed9180",
+  "watchlist_line": "- FIXTURE JULIETT LENDING BDC: Dunmore Insurance Brokers LLC maturity moved out 24 months (2028-03-15 to 2030-03-15); Crestline Roofing Holdings LLC marked down 7.5 points (97.5 to 90.0); Foxglove Specialty Pharma Inc. PIK up 2.50 percentage points (0.00% to 2.50%) (0009000014-26-000141) (added 2026-10-15)"
+}

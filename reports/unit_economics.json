@@ -1,0 +1,111 @@
+{
+  "cost_of_failure": {
+    "false_alert_minutes": 15,
+    "false_alert_usd": 30.0,
+    "false_alerts_on_fixture": 0,
+    "leak_cost_is_assumption": true,
+    "leak_cost_usd": 250000,
+    "why_approvals": "one client's position in another's letter is the costliest failure; approvals of the exact payload and the R-OTHER-MANDATE rule stop it before anything leaves the firm"
+  },
+  "cost_per_completed_task": {
+    "by_task_usd": {
+      "dev-01": 0.00512,
+      "dev-02": 0.00256,
+      "dev-03": 0.00512,
+      "dev-04": 0.00896,
+      "dev-05": 0.01024,
+      "dev-06": 0.0064,
+      "dev-07": 0.00384,
+      "dev-08": 0.00512
+    },
+    "client_note_usd": 0.00512,
+    "note": "the stand-in model's tokens (2,000 in / 300 out per step) at params.yaml's illustrative prices; Part 2 measures a real model",
+    "steps": 4,
+    "usd_per_step": 0.00128
+  },
+  "cost_per_mandate_month": {
+    "mandate_a": {
+      "briefs": 1,
+      "idle_usd": 0.0,
+      "model_tasks": 4,
+      "model_usd": 0.02048,
+      "total_usd": 0.02048,
+      "usd_per_task": 0.00512
+    },
+    "mandate_b": {
+      "briefs": 1,
+      "idle_usd": 0.0,
+      "model_tasks": 3,
+      "model_usd": 0.01536,
+      "total_usd": 0.01536,
+      "usd_per_task": 0.00512
+    }
+  },
+  "human_time_saved": {
+    "analyst_hours_per_review": 3.0,
+    "analyst_rate_usd": 120.0,
+    "bdc_reviews_per_release": 4,
+    "sensitivity": [
+      {
+        "hours": 6.0,
+        "scenario": "x0.5",
+        "usd": 720.0
+      },
+      {
+        "hours": 12.0,
+        "scenario": "x1",
+        "usd": 1440.0
+      },
+      {
+        "hours": 24.0,
+        "scenario": "x2",
+        "usd": 2880.0
+      }
+    ]
+  },
+  "idle_cost_per_mandate_month": {
+    "model_usd_per_run": 0.0,
+    "note": "no model calls in the heartbeat; compute and hosting are not modelled",
+    "runs_per_month": {
+      "edgar_watch_dag": 1440,
+      "hygiene_dag": 4,
+      "monthly_brief_dag": 22,
+      "release_watch_dag": 30
+    },
+    "usd": 0.0
+  },
+  "latency": {
+    "filing_accepted_to_alert_minutes": "within one 30-minute poll (live)",
+    "release_published_to_brief_ready_minutes": 90.0
+  },
+  "quality": {
+    "adherence": {
+      "held_after_learning": 4,
+      "rules": 4
+    },
+    "dev_suite": "8/8 pass",
+    "signal_precision_recall": {
+      "fixture": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "variant 1": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "variant 2": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "variant 3": {
+        "precision": 1.0,
+        "recall": 1.0
+      }
+    }
+  },
+  "tasks_per_mandate_month": {
+    "bdc_review_per_held_bdc": 1,
+    "brief": 1,
+    "client_note": 1
+  }
+}
