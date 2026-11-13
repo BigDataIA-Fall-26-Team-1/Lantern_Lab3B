@@ -219,3 +219,15 @@ def test_the_economics_dry_run_writes_nothing_and_apply_writes_only_reports(scra
     assert report.main(["--provider", "standin", "--apply"], root=scratch_root, out=printed.append) == 0
     after = snapshot(scratch_root)
     assert {f for f in after if before.get(f) != after[f]} == {"reports/unit_economics.md", "reports/unit_economics.json"}
+
+
+# ---- the capstone always changes the payload, whatever the note says
+@pytest.mark.parametrize("body", ["Your exposure: Golf, Hotel and Juliett.",          # no "marked down" in it
+                                  "Juliett marked down 7.5 points.", "", "1.5 / 2.0", "REVISED text"])
+def test_the_capstone_always_changes_the_payload_and_the_send_is_blocked(scratch_root, body):
+    from creditwatch import clock
+    swapped, _ = release_morning.swap_one_word(body or "x")
+    assert swapped != (body or "x")
+    cap = release_morning._capstone(scratch_root, TOKEN, "priya", "mandate_a", body, clock.clock().timestamp())
+    assert cap["payload_changed"] and cap["revised_hash"] != cap["approved_hash"]
+    assert (cap["sent"], cap["rule_id"], cap["reason"]) == (False, "R-TOKEN", "payload_changed")

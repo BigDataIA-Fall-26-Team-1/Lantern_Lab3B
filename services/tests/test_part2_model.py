@@ -220,7 +220,7 @@ def test_replay_without_a_recording_says_so_clearly(scratch_root, monkeypatch, t
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
     monkeypatch.setattr(cli, "run_task", lambda *a, **k: run_task(*a, **{**k, "cache_dir": tmp_path}))
     printed = []
-    assert cli.main(["eval", "run", "--suite", "dev"], root=scratch_root, out=printed.append) == 1
+    assert cli.main(["eval", "run", "--provider", "openai", "--suite", "dev"], root=scratch_root, out=printed.append) == 1
     assert printed[-1].startswith("not recorded yet")
 
 
@@ -229,21 +229,21 @@ def test_the_estimate_calls_nothing_and_record_needs_the_key(scratch_root, monke
     monkeypatch.setattr(openai_provider, "chat", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no API call")))
     monkeypatch.setattr(httpx, "post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no network")))
     printed = []
-    assert cli.main(["eval", "run", "--suite", "dev", "--mode", "record", "--estimate"], root=scratch_root,
+    assert cli.main(["eval", "run", "--provider", "openai", "--suite", "dev", "--mode", "record", "--estimate"], root=scratch_root,
                     out=printed.append) == 0
     total = printed[-1]
     assert total.startswith("ESTIMATE") and "No API call was made" in total and len(printed) == 9
     usd = float(re.search(r"~\$([0-9.]+) \(hard cap", total).group(1))
     assert 0 < usd < CFG["record_budget_usd"]
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert cli.main(["eval", "run", "--suite", "dev", "--mode", "record"], root=scratch_root, out=printed.append) == 2
+    assert cli.main(["eval", "run", "--provider", "openai", "--suite", "dev", "--mode", "record"], root=scratch_root, out=printed.append) == 2
     assert "OPENAI_API_KEY" in printed[-1] and FAKE_KEY not in " ".join(printed)
 
 
 # ---- 4 and 6: on the REAL recorded cache (skipped until you have run the record step)
 REAL = ROOT / CFG["cache"]
 recorded = pytest.mark.skipif(not list(REAL.glob("*.json")),
-                              reason="run the record step first: ./lantern eval run --suite dev --mode record")
+                              reason="run the record step first: ./lantern eval run --provider openai --suite dev --mode record")
 
 
 @recorded
@@ -269,3 +269,31 @@ def test_the_dev_suite_replays_from_the_real_cache_with_every_check_reported():
     rows = cli.run_suite(ROOT, "dev", TOKEN, provider="openai")
     assert len(rows) == len(DEV) and all(set(r["checks"]) == {"sequence", "refusal", "isolation"} for r in rows)
     assert all(r["provider"] == "openai" for r in rows)
+
+
+# ---- regression: record and replay call tools with the SAME argument order (dev-06's cache miss)
+def test_record_and_replay_call_tools_with_the_models_own_argument_order(tmp_path):
+    """The cache stores answers with sorted keys; a tool error that quotes its input made replay
+    diverge. Both modes now rebuild arguments from the model's original string."""
+    def reply(b, n):
+        if n == 1:   # arguments in NON-alphabetical order, as a real model may send them
+            return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [{
+                "id": "call_1", "type": "function", "function": {"name": "echo",
+                "arguments": '{"zeta": 1, "alpha": 2, "rationale": "r"}'}}]}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 1}}
+        return completion(b["model"], text="done")
+    echo = lambda **kw: {"error": f"input_value={kw!r}"}                       # quotes the order it was given
+    fake = FakeChat(reply)
+    m = llm.AgentModel(CFG, llm.client(CFG, tmp_path, "record", chat=fake), "gpt-5.4-mini", tools=[])
+    _, t1 = loop.run_agent(m, {"echo": echo}, "task", clock.clock)
+    second = fake.bodies[1]["messages"][-1]["content"]
+    assert "'zeta': 1, 'alpha': 2" in second                                   # the model's order, not sorted
+    m2 = llm.AgentModel(CFG, llm.client(CFG, tmp_path, "replay"), "gpt-5.4-mini", tools=[])
+    _, t2 = loop.run_agent(m2, {"echo": echo}, "task", clock.clock)            # no CacheMiss
+    assert json.dumps(t1, sort_keys=True) == json.dumps(t2, sort_keys=True) and len(fake.bodies) == 2
+
+
+def test_the_default_provider_is_the_stand_in_so_plain_commands_reproduce_the_graded_outputs():
+    assert P["model"]["provider"] == "standin"
+    rec = run_task(ROOT, DEV["dev-01"], TOKEN)                         # no --provider: the stand-in
+    assert rec["provider"] == "standin" and rec["passed"]

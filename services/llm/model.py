@@ -45,6 +45,18 @@ def price(cfg, model, tokens_in, tokens_out):
     return round((tokens_in * p["in"] + tokens_out * p["out"]) / 1e6, 8)
 
 
+def args_from_raw(raw):
+    """The tool arguments, in the model's own order, without the rationale."""
+    try:
+        args = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(args, dict):
+        return {}
+    args.pop("rationale", None)
+    return args
+
+
 def normalise(resp, cfg, model):
     msg = resp["choices"][0]["message"]
     u = resp.get("usage") or {}
@@ -113,8 +125,12 @@ class AgentModel:
             convo.append({"role": "assistant", "content": None, "tool_calls": [
                 {"id": h["call_id"], "type": "function", "function": {"name": h["tool"], "arguments": h["arguments_raw"]}}]})
             convo.append({"role": "tool", "tool_call_id": h["call_id"], "content": m["content"]})
-        out = self.client(body(self.cfg, self.model, convo, tools=self.tools, tool_choice="auto",
-                               parallel_tool_calls=False))
+        out = dict(self.client(body(self.cfg, self.model, convo, tools=self.tools, tool_choice="auto",
+                                    parallel_tool_calls=False)))
         if out.get("tool"):
+            # The cache stores answers with sorted keys, but the model's call has its own argument
+            # order, and a tool's error message can quote it. Rebuild the arguments from the model's
+            # original string in BOTH modes, so record and replay call the tool identically.
+            out["args"] = args_from_raw(out.get("arguments_raw") or "{}")
             self.history.append(out)
-        return dict(out)
+        return out

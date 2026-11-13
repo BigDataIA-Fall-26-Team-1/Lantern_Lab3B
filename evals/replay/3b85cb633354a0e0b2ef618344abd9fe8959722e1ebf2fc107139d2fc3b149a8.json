@@ -1,0 +1,1 @@
+{"args": {}, "arguments_raw": "{\"rationale\":\"Confirm the active client mandate id before pulling any client or holdings data.\"}", "call_id": "call_mj6BRH0LmhFOElIhhkSDjW3a", "model": "gpt-5.4-nano", "rationale": "Confirm the active client mandate id before pulling any client or holdings data.", "tokens_in": 2391, "tokens_out": 33, "tool": "list_mandates", "usd": 0.00051945}

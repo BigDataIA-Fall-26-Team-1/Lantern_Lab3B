@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -42,6 +43,20 @@ def _call(server, tool, args):
     return asyncio.run(go())
 
 
+class CapstoneError(RuntimeError):
+    """The capstone failed to change the approved payload, so it would prove nothing."""
+
+
+def swap_one_word(body):
+    """Replace the first word (3+ letters) with REVISED; if there is none, append REVISED.
+    Always returns a different text, whatever the note says."""
+    m = re.search(r"[A-Za-z]{3,}", body)
+    if m:
+        repl = "AMENDED" if m.group(0) == "REVISED" else "REVISED"
+        return body[:m.start()] + repl + body[m.end():], f"{m.group(0)} -> {repl}"
+    return body + " REVISED", "(no word to swap) appended REVISED"
+
+
 def _capstone(root, token, principal, mandate, body, now):
     """Approve a draft, swap one word, send: the token no longer matches (slide 43)."""
     P, users, mandates = load_config(root)
@@ -49,17 +64,20 @@ def _capstone(root, token, principal, mandate, body, now):
     led, store = audit.Ledger(clock=clock.clock), ActionStore()
     server = build_server(s, led, root=root, store=store, now=lambda: now)
     to = [c for c in mandates[mandate]["contacts"] if c.startswith("cio@")][:1]
+    body = body or "Capstone check: the approved note text."       # the real model may not have sent a note
     d = _call(server, "draft_email", {"scope": mandate, "to": to, "subject": "BDC credit note", "body": body}).structured_content
     _call(server, "request_approval", {"draft_id": d["draft_id"]})
     tok = grant(store, d["draft_id"], s, led, now, P["approvals"]["ttl_minutes"])
-    swapped = body.replace("marked down", "marked lower", 1)                  # one word
-    _call(server, "draft_email", {"scope": mandate, "to": to, "subject": "BDC credit note", "body": swapped,
-                                  "draft_id": d["draft_id"]})
+    swapped, what = swap_one_word(body)
+    rev = _call(server, "draft_email", {"scope": mandate, "to": to, "subject": "BDC credit note", "body": swapped,
+                                        "draft_id": d["draft_id"]}).structured_content
+    if swapped == body or rev["payload_hash"] == d["payload_hash"]:
+        raise CapstoneError("the swapped draft has the approved payload hash: nothing was changed")
     r = _call(server, "send_email", {"scope": mandate, "draft_id": d["draft_id"], "approval_token": tok})
     block = led.find("policy_block", tool="send_email")
-    return {"draft_id": d["draft_id"], "approved_hash": d["payload_hash"], "swapped": "marked down -> marked lower",
-            "sent": not r.is_error, "rule_id": block[-1]["rule_id"] if block else None,
-            "reason": block[-1].get("reason") if block else None}
+    return {"draft_id": d["draft_id"], "approved_hash": d["payload_hash"], "revised_hash": rev["payload_hash"],
+            "payload_changed": True, "swapped": what, "sent": not r.is_error,
+            "rule_id": block[-1]["rule_id"] if block else None, "reason": block[-1].get("reason") if block else None}
 
 
 def scenario(root, token, principal="priya", mandate="mandate_a", provider=None, mode="replay", spend=None):

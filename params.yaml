@@ -34,7 +34,7 @@ prices:                                    # illustrative: replace with your pro
   usd_per_mtok_in: 0.40
   usd_per_mtok_out: 1.60
 model:                                     # Part 2: the real model behind the kit's ReplayClient
-  provider: openai                         # openai, or standin (the kit's offline stand-in)
+  provider: standin                        # default: the stand-in (graded outputs); --provider openai replays the real model
   base_url: https://api.openai.com/v1      # the key is read ONLY from OPENAI_API_KEY, at call time
   routes: {agent: gpt-5.4-mini, triage: gpt-5.4-nano, materiality: gpt-5.4-nano}
   prices_per_mtok:                         # USD per 1M tokens (OpenAI pricing page, given by the user)

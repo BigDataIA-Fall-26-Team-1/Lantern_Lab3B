@@ -1,0 +1,1 @@
+{"args": {"scope": "mandate_a"}, "arguments_raw": "{\"scope\":\"mandate_a\",\"rationale\":\"Read the active client's positions to answer the question.\"}", "call_id": "call_6dGu4hMwook7ikb3eNyf1WvS", "model": "gpt-5.4-mini", "rationale": "Read the active client's positions to answer the question.", "tokens_in": 2661, "tokens_out": 35, "tool": "mandate_profile", "usd": 0.00215325}

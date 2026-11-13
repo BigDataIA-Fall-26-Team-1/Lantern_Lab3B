@@ -1,0 +1,1 @@
+{"args": {}, "arguments_raw": "{\"rationale\":\"Confirm the active mandate before taking any client-scoped action.\"}", "call_id": "call_6RnSYTkJI892WsYSo0ECnhoi", "model": "gpt-5.4-mini", "rationale": "Confirm the active mandate before taking any client-scoped action.", "tokens_in": 2585, "tokens_out": 60, "tool": "list_mandates", "usd": 0.00220875}

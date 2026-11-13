@@ -2,12 +2,14 @@
 
     ./lantern eval run --suite dev --mode replay                    # grade and print; writes nothing
     ./lantern eval run --suite dev --mode replay --apply            # also writes outputs/tasks/dev.jsonl
-    ./lantern eval run --suite dev --mode record --estimate         # estimated cost; NO API call
-    ./lantern eval run --suite dev --mode record                    # REAL API calls, once (needs OPENAI_API_KEY)
-    ./lantern eval twice --task dev-01                              # one task replayed twice: identical traces?
+    ./lantern eval run --provider openai --suite dev --mode record --estimate   # estimated cost; NO API call
+    ./lantern eval run --provider openai --suite dev --mode record              # REAL API calls (OPENAI_API_KEY)
+    ./lantern eval run --provider openai --suite dev                            # the real model, in replay
+    ./lantern eval twice --task dev-01 --provider openai                        # replayed twice: identical?
 
---provider openai (params.yaml default) uses the real model behind the kit's ReplayClient, with
-the cache in evals/replay/; --provider standin uses the kit's offline stand-in. Replay never calls
+--provider standin (params.yaml default) uses the kit's offline stand-in, which produced the graded
+outputs; --provider openai uses the real model behind the kit's ReplayClient (cache: evals/replay/).
+The provider is not part of any request, so switching it never changes the cache. Replay never calls
 the provider: a request never recorded is a CacheMiss. A record session stops cleanly before it
 passes model.record_budget_usd. Every task runs in its own sandbox. The session token is read
 ONLY from CREDITWATCH_TOKEN, the API key ONLY from OPENAI_API_KEY (never printed or stored).
@@ -110,7 +112,7 @@ def main(argv=None, root=ROOT, out=print):
         records = run_suite(root, a.suite, token, principal, provider=provider, mode=a.mode, spend=spend)
     except CacheMiss:
         out("not recorded yet: a request has no entry in the replay cache. Run the record step first "
-            "(./lantern eval run --suite dev --mode record), then replay.")
+            "(./lantern eval run --provider openai --suite dev --mode record), then replay.")
         return 1
     except RecordBudgetExceeded as e:
         out(f"Stopped: {e}")
