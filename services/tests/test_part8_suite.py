@@ -43,7 +43,7 @@ def snapshot(root, dirs=("agent", "logs", "outputs", ".cache", "reports")):
 # ---- step 1, test 1: each dev task passes, with our server's exact decisions
 @pytest.mark.parametrize("task_id", sorted(BY_ID))
 def test_each_dev_task_passes_with_the_servers_exact_decisions(task_id):
-    r = run_task(ROOT, BY_ID[task_id], TOKEN)
+    r = run_task(ROOT, BY_ID[task_id], TOKEN, provider="standin")
     assert r["passed"], r["checks"]
     assert [f"{a['tool']} {a['decision']}" for a in r["actions"]] == DECISIONS[task_id]
     assert set(TASK_FIELDS) <= set(r) and all(set(a) == {"tool", "action_class", "args_hash", "decision"}
@@ -53,13 +53,13 @@ def test_each_dev_task_passes_with_the_servers_exact_decisions(task_id):
 
 
 def test_the_refusals_come_from_our_server_and_the_sends_stay_in_the_sandbox(scratch_root):
-    r, ex = run_in(scratch_root, BY_ID["dev-02"], TOKEN)
+    r, ex = run_in(scratch_root, BY_ID["dev-02"], TOKEN, provider="standin")
     assert ex["ledger"].find("policy_block", rule_id="R-SCOPE", scope="mandate_b")
     assert "another client" in r["final_response"]
-    r, ex = run_in(scratch_root, BY_ID["dev-05"], TOKEN)
+    r, ex = run_in(scratch_root, BY_ID["dev-05"], TOKEN, provider="standin")
     assert ex["ledger"].find("policy_block", tool="send_email", rule_id="R-TOKEN", reason="payload_changed")
     assert "blocked" in r["final_response"]
-    r, ex = run_in(scratch_root, BY_ID["dev-04"], TOKEN)
+    r, ex = run_in(scratch_root, BY_ID["dev-04"], TOKEN, provider="standin")
     assert [p.name for p in (scratch_root / "outputs" / "outbox").glob("*.json")] == ["mock-0001.json"]
     assert "$TOKEN" not in json.dumps(r) and ex["ledger"].find("approval_granted")
 
@@ -82,8 +82,8 @@ def test_the_grader_fails_each_wrong_behaviour():
 # ---- tests 3 and 4: the real project is untouched, and runs are deterministic
 def test_the_suite_leaves_the_real_project_untouched_and_is_deterministic():
     before = snapshot(ROOT)
-    a = cli.run_suite(ROOT, "dev", TOKEN)
-    b = cli.run_suite(ROOT, "dev", TOKEN)
+    a = cli.run_suite(ROOT, "dev", TOKEN, provider="standin")
+    b = cli.run_suite(ROOT, "dev", TOKEN, provider="standin")
     assert snapshot(ROOT) == before
     assert [json.dumps(x, sort_keys=True) for x in a] == [json.dumps(x, sort_keys=True) for x in b]
 
@@ -92,15 +92,15 @@ def test_the_lantern_cli_dry_run_writes_nothing_and_apply_writes_only_the_result
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
     before = snapshot(scratch_root)
     printed = []
-    assert cli.main(["eval", "run", "--suite", "dev", "--mode", "replay"], root=scratch_root, out=printed.append) == 0
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "dev", "--mode", "replay"], root=scratch_root, out=printed.append) == 0
     assert snapshot(scratch_root) == before and "8/8 tasks pass" in printed
-    assert cli.main(["eval", "run", "--suite", "dev", "--mode", "replay", "--apply"], root=scratch_root,
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "dev", "--mode", "replay", "--apply"], root=scratch_root,
                     out=printed.append) == 0
     after = snapshot(scratch_root)
     assert {f for f in after if before.get(f) != after[f]} == {"outputs/tasks/dev.jsonl"}
-    assert cli.main(["eval", "run", "--suite", "dev", "--mode", "record"], root=scratch_root, out=printed.append) == 2
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "dev", "--mode", "record"], root=scratch_root, out=printed.append) == 2
     monkeypatch.delenv("CREDITWATCH_TOKEN")
-    assert cli.main(["eval", "run", "--suite", "dev"], root=scratch_root, out=printed.append) == 2
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "dev"], root=scratch_root, out=printed.append) == 2
 
 
 # ---- test 7 (tasks): the kit's own checks on the scratch copy
@@ -108,7 +108,7 @@ def test_the_kits_task_lines_pass_after_apply(scratch_root, monkeypatch):
     from creditwatch.check import run_checks
     from services.heartbeat.run import simulate_day
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
-    cli.main(["eval", "run", "--suite", "dev", "--mode", "replay", "--apply"], root=scratch_root, out=lambda x: None)
+    cli.main(["eval", "run", "--provider", "standin", "--suite", "dev", "--mode", "replay", "--apply"], root=scratch_root, out=lambda x: None)
     simulate_day(scratch_root)                                    # the isolation line also reads alerts.jsonl
     res = {name: ok for name, ok, _ in run_checks(scratch_root)}
     assert res["outputs/tasks/dev.jsonl: every dev task, all fields (Appendix G)"]
@@ -120,12 +120,12 @@ def test_the_kits_task_lines_pass_after_apply(scratch_root, monkeypatch):
 def test_the_variant_suite_reports_not_released_then_runs_when_given(scratch_root, monkeypatch):
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
     printed = []
-    assert cli.main(["eval", "run", "--suite", "variant"], root=scratch_root, out=printed.append) == 0
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "variant"], root=scratch_root, out=printed.append) == 0
     assert printed[-1].startswith("variant prompts not released yet")
     v = scratch_root / "evals" / "tasks" / "variant.jsonl"
     v.parent.mkdir(parents=True)
     v.write_text("".join(json.dumps({**BY_ID[i], "task_id": f"v-{i[-2:]}"}) + "\n" for i in ("dev-02", "dev-06")))
-    assert cli.main(["eval", "run", "--suite", "variant", "--apply"], root=scratch_root, out=printed.append) == 0
+    assert cli.main(["eval", "run", "--provider", "standin", "--suite", "variant", "--apply"], root=scratch_root, out=printed.append) == 0
     out = [json.loads(x) for x in (scratch_root / "outputs" / "tasks" / "variant.jsonl").read_text().splitlines()]
     assert [r["task_id"] for r in out] == ["v-02", "v-06"] and all(r["passed"] for r in out)
 
@@ -138,7 +138,7 @@ def test_the_release_morning_record_shows_the_send_the_entry_and_the_approvals(s
     import shutil
     from creditwatch import approvals
     shutil.copy(ROOT / "agent" / "PRINCIPAL.md", scratch_root / "agent" / "PRINCIPAL.md")   # the LEARNED rules
-    rec = release_morning.scenario(scratch_root, TOKEN)
+    rec = release_morning.scenario(scratch_root, TOKEN, provider="standin")
     assert rec["outbox_message_id"] == "mock-0001" and rec["watchlist_entry_id"].startswith("wl-")
     assert [s["step"] for s in rec["steps"]] == ["release tick", "edgar watch", "brief for Priya",
                                                   "client note: draft, approval, send",
@@ -170,9 +170,9 @@ def test_the_scenario_dry_run_writes_nothing_and_apply_writes_only_the_record(sc
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
     before = snapshot(scratch_root)
     printed = []
-    assert release_morning.main([], root=scratch_root, out=printed.append) == 0
+    assert release_morning.main(["--provider", "standin"], root=scratch_root, out=printed.append) == 0
     assert snapshot(scratch_root) == before and printed[-1].startswith("Dry run")
-    assert release_morning.main(["--apply"], root=scratch_root, out=printed.append) == 0
+    assert release_morning.main(["--provider", "standin", "--apply"], root=scratch_root, out=printed.append) == 0
     after = snapshot(scratch_root)
     assert {f for f in after if before.get(f) != after[f]} == {"outputs/scenario/release_morning.json"}
     res = {name: ok for name, ok, _ in run_checks(scratch_root)}
@@ -187,7 +187,7 @@ SLIDE_41 = ["Cost per completed task", "Latency", "Human time saved", "Quality",
 
 
 def test_the_unit_economics_cover_slide_41_and_the_arithmetic_holds():
-    e = report.build(ROOT, TOKEN)
+    e = report.build(ROOT, TOKEN, provider="standin")
     pr, ec = P["prices"], P["economics"]
     step = econ.step_usd(2000, 300, pr["usd_per_mtok_in"], pr["usd_per_mtok_out"])
     c = e["cost_per_completed_task"]
@@ -214,8 +214,8 @@ def test_the_economics_dry_run_writes_nothing_and_apply_writes_only_reports(scra
     monkeypatch.setenv("CREDITWATCH_TOKEN", TOKEN)
     before = snapshot(scratch_root)
     printed = []
-    assert report.main([], root=scratch_root, out=printed.append) == 0
+    assert report.main(["--provider", "standin"], root=scratch_root, out=printed.append) == 0
     assert snapshot(scratch_root) == before and printed[-1].startswith("Dry run")
-    assert report.main(["--apply"], root=scratch_root, out=printed.append) == 0
+    assert report.main(["--provider", "standin", "--apply"], root=scratch_root, out=printed.append) == 0
     after = snapshot(scratch_root)
     assert {f for f in after if before.get(f) != after[f]} == {"reports/unit_economics.md", "reports/unit_economics.json"}

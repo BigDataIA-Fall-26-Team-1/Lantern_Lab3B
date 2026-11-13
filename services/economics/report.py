@@ -58,11 +58,11 @@ def _adherence(root):
     return {"rules": len(files), "held_after_learning": held}
 
 
-def build(root, token, principal="priya"):
+def build(root, token, principal="priya", provider=None):
     root = Path(root)
     P, _, mandates = load_config(root)
     ec, pr = P["economics"], P["prices"]
-    records = run_suite(root, "dev", token, principal)                       # each task in its own sandbox
+    records = run_suite(root, "dev", token, principal, provider=provider)   # each task in its own sandbox, replay
     by_id = {r["task_id"]: r for r in records}
     note = by_id["dev-01"]
     step_usd = econ.step_usd(2000, 300, pr["usd_per_mtok_in"], pr["usd_per_mtok_out"])
@@ -148,13 +148,14 @@ def markdown(e):
 def main(argv=None, root=ROOT, out=print):
     ap = argparse.ArgumentParser(description="The unit-economics table")
     ap.add_argument("--apply", action="store_true", help="write reports/unit_economics.md and .json")
+    ap.add_argument("--provider", choices=["openai", "standin"], default=None)
     a = ap.parse_args(argv)
     P, _, _ = load_config(root)
     token = os.environ.get("CREDITWATCH_TOKEN")
     if not token:
         out("set CREDITWATCH_TOKEN in the environment")
         return 2
-    e = build(root, token, os.environ.get("CREDITWATCH_PRINCIPAL", P["agent"]["principal"]))
+    e = build(root, token, os.environ.get("CREDITWATCH_PRINCIPAL", P["agent"]["principal"]), provider=a.provider)
     md = markdown(e)
     out(md)
     if a.apply:

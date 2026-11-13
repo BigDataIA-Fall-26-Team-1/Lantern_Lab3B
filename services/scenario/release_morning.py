@@ -13,6 +13,7 @@ record. The session token is read ONLY from the environment (CREDITWATCH_TOKEN).
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -21,6 +22,7 @@ from pathlib import Path
 from mcp import Client
 
 from creditwatch import audit, channel, clock, evals, policy
+from creditwatch.llm import CacheMiss
 from services.actions.approve import grant
 from services.actions.store import ActionStore
 from services.chat.session import ROOT, SkillsTampered, load_config
@@ -28,6 +30,8 @@ from services.evals.runner import run_in
 from services.heartbeat import brief_job, edgar_job, release_job
 from services.learning.checks import ADHERENCE
 from services.learning.replay import scratch_copy
+from services.llm.model import RecordBudgetExceeded, Spend
+from services.llm.openai_provider import ProviderError
 from services.mcp.server import build_server, others_of
 
 
@@ -58,7 +62,7 @@ def _capstone(root, token, principal, mandate, body, now):
             "reason": block[-1].get("reason") if block else None}
 
 
-def scenario(root, token, principal="priya", mandate="mandate_a"):
+def scenario(root, token, principal="priya", mandate="mandate_a", provider=None, mode="replay", spend=None):
     root = Path(root)
     P, _, mandates = load_config(root)
     t6 = clock.clock()
@@ -76,7 +80,8 @@ def scenario(root, token, principal="priya", mandate="mandate_a"):
     send_at = t730.timestamp() + 120
     note, nx = run_in(root, {"task_id": "scenario-note", "category": "approval", "mandate": mandate,
                              "prompt": "Send the approved note to the client's CIO."},
-                      token, principal, run_id="scenario-note", now=lambda: send_at)
+                      token, principal, run_id="scenario-note", now=lambda: send_at,
+                      provider=provider, mode=mode, spend=spend)
     sent = nx["ledger"].find("tool_call", tool="send_email", decision="executed")
     message_id = sent[0]["message_id"] if sent else None
     outbox = json.loads((root / "outputs" / "outbox" / f"{message_id}.json").read_text()) if message_id else {}
@@ -85,7 +90,8 @@ def scenario(root, token, principal="priya", mandate="mandate_a"):
 
     wl, wx = run_in(root, {"task_id": "scenario-watchlist", "category": "watchlist", "mandate": mandate,
                            "prompt": "Add Juliett to the client's watchlist; Priya has approved."},
-                    token, principal, run_id="scenario-watchlist", now=lambda: send_at)
+                    token, principal, run_id="scenario-watchlist", now=lambda: send_at,
+                    provider=provider, mode=mode, spend=spend)
     written = wx["ledger"].find("tool_call", tool="watchlist_write", decision="executed")
     entry_id = written[0]["entry_id"] if written else None
     steps.append({"time": "07:34", "step": "watchlist entry: request, approval, write",
@@ -116,18 +122,36 @@ def scenario(root, token, principal="priya", mandate="mandate_a"):
 def main(argv=None, root=ROOT, out=print):
     ap = argparse.ArgumentParser(description="Run one release morning end to end, in a sandbox")
     ap.add_argument("--apply", action="store_true", help="write outputs/scenario/release_morning.json")
+    ap.add_argument("--mode", choices=["replay", "record"], default="replay")
+    ap.add_argument("--provider", choices=["openai", "standin"], default=None)
     a = ap.parse_args(argv)
+    logging.getLogger("mcp").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     P, _, _ = load_config(root)
+    provider = a.provider or P["model"]["provider"]
     token = os.environ.get("CREDITWATCH_TOKEN")
     if not token:
         out("set CREDITWATCH_TOKEN in the environment")
         return 2
+    if a.mode == "record" and (provider == "standin" or not os.environ.get("OPENAI_API_KEY")):
+        out("--mode record needs --provider openai and OPENAI_API_KEY in the environment (never printed or stored)")
+        return 2
+    spend = Spend(P["model"]["record_budget_usd"]) if a.mode == "record" else None
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            rec = scenario(scratch_copy(root, tmp), token, os.environ.get("CREDITWATCH_PRINCIPAL", P["agent"]["principal"]))
+            rec = scenario(scratch_copy(root, tmp), token, os.environ.get("CREDITWATCH_PRINCIPAL", P["agent"]["principal"]),
+                           provider=provider, mode=a.mode, spend=spend)
     except (PermissionError, SkillsTampered) as e:
         out(f"Refused: {e}")
         return 1
+    except CacheMiss:
+        out("not recorded yet: run python -m services.scenario.release_morning --mode record first, then replay.")
+        return 1
+    except (RecordBudgetExceeded, ProviderError) as e:
+        out(f"Stopped: {e}")
+        return 1
+    if spend is not None:
+        out(f"Recorded: {spend.calls} provider calls, ${spend.usd:.4f} spent (cap ${spend.cap:.2f}).")
     for s in rec["steps"]:
         out(f"{s['time']} {s['step']}: " + json.dumps({k: v for k, v in s.items() if k not in ('time', 'step')}))
     out(f"outbox_message_id {rec['outbox_message_id']} | watchlist_entry_id {rec['watchlist_entry_id']} | "

@@ -33,6 +33,17 @@ sec:
 prices:                                    # illustrative: replace with your provider's current prices
   usd_per_mtok_in: 0.40
   usd_per_mtok_out: 1.60
+model:                                     # Part 2: the real model behind the kit's ReplayClient
+  provider: openai                         # openai, or standin (the kit's offline stand-in)
+  base_url: https://api.openai.com/v1      # the key is read ONLY from OPENAI_API_KEY, at call time
+  routes: {agent: gpt-5.4-mini, triage: gpt-5.4-nano, materiality: gpt-5.4-nano}
+  prices_per_mtok:                         # USD per 1M tokens (OpenAI pricing page, given by the user)
+    gpt-5.4-mini: {in: 0.75, out: 4.50}
+    gpt-5.4-nano: {in: 0.20, out: 1.25}
+  temperature: null                        # omitted: GPT-5 models may reject it; replay gives determinism
+  max_completion_tokens: 4000              # per call, reasoning included
+  cache: evals/replay                      # committed: tests and CI replay without a key
+  record_budget_usd: 1.00                  # a record session stops cleanly before passing this
 economics:                                 # assumptions: state and justify your own
   analyst_hours_per_review: 3.0
   analyst_rate_usd: 120.0
